@@ -43,8 +43,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -71,48 +69,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             InOutStockerTheme {
                 val navController = rememberNavController()
-
-                // Set up NavHost
-                NavHost(navController = navController, startDestination = "login") {
-                    composable("login") {
-                        PermissionHandler {
-                            LoginPage(navController)
-                        }
-                    }
-                    composable("homeScreen/{username}/{depot}") { backStackEntry ->
-                        val username = backStackEntry.arguments?.getString("username") ?: ""
-                        val depot = backStackEntry.arguments?.getString("depot") ?: ""
-                        HomeScreen(
-                            username = username,
-                            depot = depot,
-                            navigateToAuditScreen = {
-                                    username, depot -> navController.navigate("auditScreen/$username/$depot")
-                            },
-                            navigateToInwardScreen = {
-                                    username, depot -> navController.navigate("inwardScreen/$username/$depot")
-                            },
-                            navigateToOutwardScreen = {
-                                    username, depot -> navController.navigate("outwardScreen/$username/$depot")
-                            }
-                        )
-                    }
-                    composable("auditScreen/{username}/{depot}") { backStackEntry ->
-                        val username = backStackEntry.arguments?.getString("username") ?: ""
-                        val depot = backStackEntry.arguments?.getString("depot") ?: ""
-                        AuditScreen(username, depot)
-                    }
-                    composable("inwardScreen/{username}/{depot}") { backStackEntry ->
-                        val username = backStackEntry.arguments?.getString("username") ?: ""
-                        val depot = backStackEntry.arguments?.getString("depot") ?: ""
-                        InwardScreen(username, depot)
-                    }
-                    composable("outwardScreen/{username}/{depot}") { backStackEntry ->
-                        val username = backStackEntry.arguments?.getString("username") ?: ""
-                        val depot = backStackEntry.arguments?.getString("depot") ?: ""
-                        OutwardScreen(username, depot)
-                    }
+                PermissionHandler {
+                    AppNavigation(navController = navController)
                 }
-
             }
         }
     }
@@ -171,6 +130,21 @@ fun openAppSettings(context: Context) {
     context.startActivity(intent)
 }
 
+fun saveCredentials(context: Context, username: String, password: String) {
+    val sharedPreferences = context.getSharedPreferences("InOutStockerPrefs", Context.MODE_PRIVATE)
+    val editor = sharedPreferences.edit()
+    editor.putString("username", username)
+    editor.putString("password", password)
+    editor.apply()
+}
+
+fun getSavedCredentials(context: Context): Pair<String, String> {
+    val sharedPreferences = context.getSharedPreferences("InOutStockerPrefs", Context.MODE_PRIVATE)
+    val username = sharedPreferences.getString("username", "") ?: ""
+    val password = sharedPreferences.getString("password", "") ?: ""
+    return Pair(username, password)
+}
+
 @Composable
 fun LoginPage(navController: NavController) {
     val context = LocalContext.current
@@ -180,6 +154,14 @@ fun LoginPage(navController: NavController) {
     var loginMessage by remember { mutableStateOf("") }
     var messageColor by remember { mutableStateOf(androidx.compose.ui.graphics.Color.Gray) }
     var loading = remember { mutableStateOf(false) }
+
+    // Load saved credentials when the screen loads
+    LaunchedEffect(Unit) {
+        val savedCredentials = getSavedCredentials(context)
+        username = savedCredentials.first
+        password = savedCredentials.second
+    }
+
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.simple_loading_animation))
     val progress by animateLottieCompositionAsState(
         composition = composition, iterations = LottieConstants.IterateForever
@@ -241,6 +223,9 @@ fun LoginPage(navController: NavController) {
                                 messageColor =
                                     if (status == "success") androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Red
                                 if (status == "success") {
+                                    // Save credentials on successful login
+                                    saveCredentials(context, username, password)
+
                                     // Navigate to HomeScreen and pass username and depot
                                     navController.navigate("homeScreen/${username}/${depot}")
                                 }
@@ -263,6 +248,9 @@ fun LoginPage(navController: NavController) {
                                 messageColor =
                                     if (status == "success") androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Red
                                 if (status == "success") {
+                                    // Save credentials on successful login
+                                    saveCredentials(context, username, password)
+
                                     // Navigate to HomeScreen and pass username and depot
                                     navController.navigate("homeScreen/${username}/${depot}")
                                 }
@@ -291,7 +279,6 @@ fun LoginPage(navController: NavController) {
                         )
                     }
                 }
-
 
                 Text(
                     text = loginMessage,

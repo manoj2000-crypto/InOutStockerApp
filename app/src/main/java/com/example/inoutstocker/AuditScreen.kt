@@ -24,14 +24,16 @@ import androidx.compose.ui.platform.LocalContext
 
 @SuppressLint("SourceLockedOrientationActivity")
 @Composable
-fun AuditScreen(username: String, depot: String) {
+fun AuditScreen(
+    username: String, depot: String, onPreview: () -> Unit, sharedViewModel: SharedViewModel
+) {
     //Stopping user to change the orientation from vertical to portrait
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
     val scannedData = remember { mutableStateOf("") }
-    val scannedItems = remember { mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>() }
+//    val scannedItems = remember { mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>() }
     val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -51,12 +53,15 @@ fun AuditScreen(username: String, depot: String) {
             ) {
                 if (isLoading.value) {
                     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.simple_loading_animation))
-                    LottieAnimation(composition, modifier = Modifier.size(150.dp).align(Alignment.Center))
+                    LottieAnimation(
+                        composition, modifier = Modifier
+                            .size(350.dp)
+                            .align(Alignment.Center)
+                    )
                 } else {
-                    BarcodeScanner(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp), // Dynamic height passed here
+                    BarcodeScanner(modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp), // Dynamic height passed here
                         onBarcodeScanned = { data ->
                             coroutineScope.launch {
                                 isLoading.value = true
@@ -65,18 +70,7 @@ fun AuditScreen(username: String, depot: String) {
 
                                 val parsedData = parseScannedData(data)
                                 parsedData?.let { (lrno, pkgsNo, boxNo) ->
-                                    val index = scannedItems.indexOfFirst { it.first == lrno }
-                                    if (index == -1) {
-                                        // New entry
-                                        scannedItems.add(lrno to (pkgsNo to listOf(boxNo)))
-                                    } else {
-                                        // Update existing entry
-                                        val (totalPkgs, boxes) = scannedItems[index].second
-                                        if (!boxes.contains(boxNo)) {
-                                            scannedItems[index] =
-                                                lrno to (totalPkgs to boxes + boxNo)
-                                        }
-                                    }
+                                    sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
                                     scannedData.value = data
                                     Log.d("AuditScreen", "Scanned Data: $data")
                                 }
@@ -88,29 +82,31 @@ fun AuditScreen(username: String, depot: String) {
             // Spacer to create space between the barcode scanner and the table header
             Spacer(modifier = Modifier.height(150.dp))
 
-            // Table Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primary)
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    "LRNO", modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp), color = Color.White
-                )
-                Text(
-                    "PkgNo", modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp), color = Color.White
-                )
-                Text(
-                    "BoxNo", modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp), color = Color.White
-                )
+            // Table Header - Visible only if there are scanned items
+            if (sharedViewModel.scannedItems.isNotEmpty()) {
+                // Table Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "LRNO", modifier = Modifier
+                            .weight(1f)
+                            .padding(8.dp), color = Color.White
+                    )
+                    Text(
+                        "PkgNo", modifier = Modifier
+                            .weight(1f)
+                            .padding(8.dp), color = Color.White
+                    )
+                    Text(
+                        "BoxNo", modifier = Modifier
+                            .weight(1f)
+                            .padding(8.dp), color = Color.White
+                    )
+                }
             }
 
             // Tabular Data
@@ -119,7 +115,7 @@ fun AuditScreen(username: String, depot: String) {
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
             ) {
-                items(scannedItems) { (lrno, pair) ->
+                items(sharedViewModel.scannedItems) { (lrno, pair) ->
                     val (totalPkgs, boxes) = pair
                     val isComplete = boxes.size == totalPkgs
                     Card(
@@ -141,6 +137,23 @@ fun AuditScreen(username: String, depot: String) {
                             Text("$totalPkgs", modifier = Modifier.weight(1f))
                             Text(boxes.joinToString(", "), modifier = Modifier.weight(1f))
                         }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f)) // Push buttons to the bottom
+            // Button - Visible only if there are scanned items
+            if (sharedViewModel.scannedItems.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Button(
+                        onClick = { onPreview() }, modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Preview")
                     }
                 }
             }

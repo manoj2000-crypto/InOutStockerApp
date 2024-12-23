@@ -4,13 +4,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +81,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenContent(
     username: String,
@@ -85,6 +91,17 @@ fun HomeScreenContent(
     onBoxOutwardClick: (String, String) -> Unit
 ) {
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(text = "Welcome, $username | Depot: $depot")
+                },
+                actions = {
+                    // You can add additional actions here if needed (e.g., settings icon)
+                }
+            )
+        },
+
         modifier = Modifier.fillMaxSize(),
         content = { paddingValues ->
             Column(
@@ -92,52 +109,37 @@ fun HomeScreenContent(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.Top,
+                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Welcome, $username")
-                    Text(
-                        text = " | Depot: $depot",
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
 
-                Button(
-                    onClick = { onBoxAuditClick(username, depot) },
-                    modifier = Modifier.padding(bottom = 16.dp)
+                // Center Section: Buttons
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Box Audit")
-                }
 
-                Button(
-                    onClick = { onBoxInwardClick(username, depot) },
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Text(text = "Box Inward")
-                }
+                    Button(
+                        onClick = { onBoxAuditClick(username, depot) },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(text = "Box Audit")
+                    }
 
-                Button(
-                    onClick = { onBoxOutwardClick(username, depot) }
-                ) {
-                    Text(text = "Box Outward")
+                    Button(
+                        onClick = { onBoxInwardClick(username, depot) },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(text = "Box Inward")
+                    }
+
+                    Button(
+                        onClick = { onBoxOutwardClick(username, depot) }
+                    ) {
+                        Text(text = "Box Outward")
+                    }
                 }
             }
         }
     )
-}
-
-fun navigateToBoxAudit() {
-    // Navigate to Box Audit Screen
-}
-
-fun navigateToBoxInward() {
-    // Navigate to Box Inward Screen
-}
-
-fun navigateToBoxOutward() {
-    // Navigate to Box Outward Screen
 }
