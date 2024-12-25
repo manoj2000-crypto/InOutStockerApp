@@ -43,7 +43,7 @@ fun AppNavigation(
         composable("inwardScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
-            InwardScreen(username, depot)
+            InwardScreen(navController, username, depot)
         }
 
         composable("outwardScreen/{username}/{depot}") { backStackEntry ->
