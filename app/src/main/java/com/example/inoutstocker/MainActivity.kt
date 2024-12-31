@@ -1,5 +1,6 @@
 package com.example.inoutstocker
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -77,49 +78,79 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@SuppressLint("InlinedApi")
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionHandler(content: @Composable () -> Unit) {
     val context = LocalContext.current
+
+    // Remember permission states for Camera, Internet, and Bluetooth
     val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
     val internetPermissionState = rememberPermissionState(android.Manifest.permission.INTERNET)
+    val bluetoothPermissionState =
+        rememberPermissionState(android.Manifest.permission.BLUETOOTH_CONNECT)
 
     LaunchedEffect(Unit) {
-        if (!cameraPermissionState.status.isGranted || !internetPermissionState.status.isGranted) {
+        // Request permissions if not already granted
+        if (!cameraPermissionState.status.isGranted || !internetPermissionState.status.isGranted || !bluetoothPermissionState.status.isGranted) {
             cameraPermissionState.launchPermissionRequest()
+            internetPermissionState.launchPermissionRequest()
+            bluetoothPermissionState.launchPermissionRequest()
         }
     }
 
-    if (!cameraPermissionState.status.isGranted) {
-        AlertDialog(onDismissRequest = {},
-            title = { Text("Camera Permission Required") },
-            text = { Text("This app requires access to your camera. Please grant the permission.") },
-            confirmButton = {
-                TextButton(onClick = { cameraPermissionState.launchPermissionRequest() }) {
-                    Text("Grant Permission")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { openAppSettings(context) }) {
-                    Text("Open Settings")
-                }
-            })
-    } else if (!internetPermissionState.status.isGranted) {
-        AlertDialog(onDismissRequest = {},
-            title = { Text("Internet Permission Required") },
-            text = { Text("This app requires internet access to function properly. Please grant the permission.") },
-            confirmButton = {
-                TextButton(onClick = { internetPermissionState.launchPermissionRequest() }) {
-                    Text("Grant Permission")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { openAppSettings(context) }) {
-                    Text("Open Settings")
-                }
-            })
-    } else {
-        content()
+    when {
+        !cameraPermissionState.status.isGranted -> {
+            AlertDialog(onDismissRequest = {},
+                title = { Text("Camera Permission Required") },
+                text = { Text("This app requires access to your camera. Please grant the permission.") },
+                confirmButton = {
+                    TextButton(onClick = { cameraPermissionState.launchPermissionRequest() }) {
+                        Text("Grant Permission")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { openAppSettings(context) }) {
+                        Text("Open Settings")
+                    }
+                })
+        }
+
+        !internetPermissionState.status.isGranted -> {
+            AlertDialog(onDismissRequest = {},
+                title = { Text("Internet Permission Required") },
+                text = { Text("This app requires internet access to function properly. Please grant the permission.") },
+                confirmButton = {
+                    TextButton(onClick = { internetPermissionState.launchPermissionRequest() }) {
+                        Text("Grant Permission")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { openAppSettings(context) }) {
+                        Text("Open Settings")
+                    }
+                })
+        }
+
+        !bluetoothPermissionState.status.isGranted -> {
+            AlertDialog(onDismissRequest = {},
+                title = { Text("Bluetooth Permission Required") },
+                text = { Text("This app requires access to Bluetooth for scanning device. Please grant the permission.") },
+                confirmButton = {
+                    TextButton(onClick = { bluetoothPermissionState.launchPermissionRequest() }) {
+                        Text("Grant Permission")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { openAppSettings(context) }) {
+                        Text("Open Settings")
+                    }
+                })
+        }
+
+        else -> {
+            content()
+        }
     }
 }
 
@@ -188,8 +219,7 @@ fun LoginPage(navController: NavController) {
                         .padding(bottom = 32.dp)
                 )
 
-                OutlinedTextField(
-                    value = username,
+                OutlinedTextField(value = username,
                     onValueChange = { username = it },
                     label = { Text("Username") },
                     isError = username.isBlank(),
@@ -199,8 +229,7 @@ fun LoginPage(navController: NavController) {
                         .padding(bottom = 16.dp)
                 )
 
-                OutlinedTextField(
-                    value = password,
+                OutlinedTextField(value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     isError = password.isBlank(),
