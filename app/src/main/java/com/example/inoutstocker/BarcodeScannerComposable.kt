@@ -8,7 +8,9 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,8 +38,7 @@ import java.util.concurrent.Executors
 @OptIn(ExperimentalGetImage::class)
 @Composable
 fun BarcodeScanner(
-    modifier: Modifier = Modifier,
-    onBarcodeScanned: (String) -> Unit
+    modifier: Modifier = Modifier, onBarcodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalContext.current as LifecycleOwner
@@ -45,6 +46,7 @@ fun BarcodeScanner(
     val executor = remember { Executors.newSingleThreadExecutor() }
     var cameraControl: CameraControl? by remember { mutableStateOf(null) }
     var isFlashlightOn by remember { mutableStateOf(false) }
+    var isCameraOn by remember { mutableStateOf(true) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -68,66 +70,101 @@ fun BarcodeScanner(
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                 val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
 
                 imageAnalysis.setAnalyzer(executor) { imageProxy ->
                     val mediaImage = imageProxy.image
                     if (mediaImage != null) {
                         val inputImage = InputImage.fromMediaImage(
-                            mediaImage,
-                            imageProxy.imageInfo.rotationDegrees
+                            mediaImage, imageProxy.imageInfo.rotationDegrees
                         )
                         val scanner = BarcodeScanning.getClient()
 
-                        scanner.process(inputImage)
-                            .addOnSuccessListener { barcodes ->
-                                for (barcode in barcodes) {
-                                    barcode.rawValue?.let { onBarcodeScanned(it) }
-                                }
+                        scanner.process(inputImage).addOnSuccessListener { barcodes ->
+                            for (barcode in barcodes) {
+                                barcode.rawValue?.let { onBarcodeScanned(it) }
                             }
-                            .addOnCompleteListener {
-                                imageProxy.close()
-                            }
+                        }.addOnCompleteListener {
+                            imageProxy.close()
+                        }
                     }
                 }
 
                 val camera = cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageAnalysis
+                    lifecycleOwner, cameraSelector, preview, imageAnalysis
                 )
                 cameraControl = camera.cameraControl
             }, ContextCompat.getMainExecutor(context))
 
             previewView
         })
-        // Flashlight Toggle Button
+        // Controls for Flashlight, Camera On/Off, and Camera Toggle
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.BottomEnd
+                .padding(16.dp), contentAlignment = Alignment.BottomEnd
         ) {
-            val icon: Painter = if (isFlashlightOn) {
-                painterResource(id = R.drawable.flashlight_off_24px)
-            } else {
-                painterResource(id = R.drawable.flashlight_on_24px)
-            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Flashlight Toggle
+                val flashlightIcon: Painter = if (isFlashlightOn) {
+                    painterResource(id = R.drawable.flashlight_off_24px)
+                } else {
+                    painterResource(id = R.drawable.flashlight_on_24px)
+                }
+                Image(
+                    painter = flashlightIcon,
+                    contentDescription = "Flashlight Toggle",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable {
+                            isFlashlightOn = !isFlashlightOn
+                            cameraControl?.enableTorch(isFlashlightOn)
+                        },
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                )
 
-            Image(
-                painter = icon,
-                contentDescription = "Flashlight Toggle",
-                modifier = Modifier
-                    .size(48.dp)
-                    .padding(8.dp)
-                    .clickable {
-                        isFlashlightOn = !isFlashlightOn
-                        cameraControl?.enableTorch(isFlashlightOn)
-                    },
-                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-            )
+                // Camera Off Toggle
+                val cameraOffIcon = painterResource(id = R.drawable.no_photography_24px)
+                Image(
+                    painter = cameraOffIcon,
+                    contentDescription = "Camera Off Toggle",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable {
+                            isCameraOn = false
+                            cameraProviderFuture
+                                .get()
+                                .unbindAll() // Unbind camera
+                        },
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                )
+
+                // Camera On Toggle
+                val cameraOnIcon = painterResource(id = R.drawable.photo_camera_24px)
+                Image(
+                    painter = cameraOnIcon,
+                    contentDescription = "Camera On Toggle",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable {
+                            isCameraOn = true
+                            // Rebind camera when turned back on
+                            cameraProviderFuture
+                                .get()
+                                .bindToLifecycle(
+                                    lifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    androidx.camera.core.Preview
+                                        .Builder()
+                                        .build()
+                                )
+                        },
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                )
+            }
         }
     }
 }

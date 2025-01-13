@@ -2,23 +2,52 @@ package com.example.inoutstocker
 
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 
 class SharedViewModel : ViewModel() {
-    val scannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    enum class FeatureType { INWARD, OUTWARD, AUDIT }
+
+    private val _featureType = mutableStateOf(FeatureType.INWARD)
+    val featureType: FeatureType get() = _featureType.value
+
+    private val inwardScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    private val outwardScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    private val auditScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+
+    val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>
+        get() = when (_featureType.value) {
+            FeatureType.INWARD -> inwardScannedItems
+            FeatureType.OUTWARD -> outwardScannedItems
+            FeatureType.AUDIT -> auditScannedItems
+        }
+
+    fun setFeatureType(type: FeatureType) {
+        _featureType.value = type
+    }
 
     fun addScannedItem(lrno: String, totalPkgs: Int, boxNo: Int) {
-        val index = scannedItems.indexOfFirst { it.first == lrno }
+        val targetList = when (_featureType.value) {
+            FeatureType.INWARD -> inwardScannedItems
+            FeatureType.OUTWARD -> outwardScannedItems
+            FeatureType.AUDIT -> auditScannedItems
+        }
+
+        val index = targetList.indexOfFirst { it.first == lrno }
         if (index == -1) {
-            scannedItems.add(lrno to (totalPkgs to listOf(boxNo)))
+            targetList.add(lrno to (totalPkgs to listOf(boxNo)))
         } else {
-            val (existingTotalPkgs, existingBoxes) = scannedItems[index].second
+            val (existingTotalPkgs, existingBoxes) = targetList[index].second
             if (!existingBoxes.contains(boxNo)) {
-                scannedItems[index] = lrno to (existingTotalPkgs to existingBoxes + boxNo)
+                targetList[index] = lrno to (existingTotalPkgs to existingBoxes + boxNo)
             }
         }
     }
 
     fun clearScannedItems() {
-        scannedItems.clear()
+        when (_featureType.value) {
+            FeatureType.INWARD -> inwardScannedItems.clear()
+            FeatureType.OUTWARD -> outwardScannedItems.clear()
+            FeatureType.AUDIT -> auditScannedItems.clear()
+        }
     }
 }
