@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.core.app.ActivityCompat
 import android.util.Log
 
+@Suppress("DEPRECATION")
 class BluetoothReceiver(
     private val onBluetoothStateChange: (Boolean) -> Unit
 ) : BroadcastReceiver() {
