@@ -3,7 +3,6 @@ package com.example.inoutstocker
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,6 +25,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,8 +64,8 @@ fun FinalCalculationForInwardScreen(
     val decodedPrnOrThc = java.net.URLDecoder.decode(prnOrThc, "UTF-8")
     val decodedPrn = java.net.URLDecoder.decode(prn, "UTF-8")
 
-    var totalQty by remember { mutableStateOf(0) }
-    var totalWeight by remember { mutableStateOf(0.0) }
+    var totalQty by remember { mutableIntStateOf(0) }
+    var totalWeight by remember { mutableDoubleStateOf(0.0) }
 
     // Calculate TotalBagQty and TotalBoxQty from scannedItems
     LaunchedEffect(scannedItems) {
@@ -85,10 +86,10 @@ fun FinalCalculationForInwardScreen(
 
     var hamaliVendorName by remember { mutableStateOf("") }
     var hamaliType by remember { mutableStateOf("") }
-    var totalAmount by remember { mutableStateOf(1000) }
+    var totalAmount by remember { mutableIntStateOf(0) }
     var deductionAmount by remember { mutableStateOf("") }
 
-    var finalAmount by remember { mutableStateOf(totalAmount) }
+    var finalAmount by remember { mutableIntStateOf(totalAmount) }
     var freight by remember { mutableStateOf("") }
     var godownKeeperName by remember { mutableStateOf("") }
     var closingKm by remember { mutableStateOf("") }
