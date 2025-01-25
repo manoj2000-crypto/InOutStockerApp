@@ -3,11 +3,7 @@ package com.example.inoutstocker
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -23,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.inoutstocker.ui.theme.InOutStockerTheme
+import kotlin.system.exitProcess
 
 @Composable
 fun HomeScreen(
@@ -37,7 +34,7 @@ fun HomeScreen(
         // Intercept the back button press
         BackHandler {
             if (backPressedOnce.value) {
-                System.exit(0)
+                exitProcess(0)
             } else {
                 backPressedOnce.value = true
                 showExitDialog.value = true
@@ -63,7 +60,7 @@ fun HomeScreen(
                 },
                 dismissButton = {
                     Button(
-                        onClick = { System.exit(0) }, colors = ButtonDefaults.buttonColors()
+                        onClick = { exitProcess(0) }, colors = ButtonDefaults.buttonColors()
                     ) {
                         Text("Yes")
                     }
@@ -123,20 +120,20 @@ fun HomeScreenContent(
                         onClick = { onBoxAuditClick(username, depot) },
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
-                        Text(text = "Box Audit")
+                        Text(text = "Stock Audit")
                     }
 
                     Button(
                         onClick = { onBoxInwardClick(username, depot) },
                         modifier = Modifier.padding(bottom = 16.dp)
                     ) {
-                        Text(text = "Box Inward")
+                        Text(text = "Inward")
                     }
 
                     Button(
                         onClick = { onBoxOutwardClick(username, depot) }
                     ) {
-                        Text(text = "Box Outward")
+                        Text(text = "Outward")
                     }
                 }
             }
