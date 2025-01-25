@@ -184,7 +184,7 @@ fun LoginPage(navController: NavController) {
     var passwordVisible by remember { mutableStateOf(false) }
     var loginMessage by remember { mutableStateOf("") }
     var messageColor by remember { mutableStateOf(androidx.compose.ui.graphics.Color.Gray) }
-    var loading = remember { mutableStateOf(false) }
+    val loading = remember { mutableStateOf(false) }
 
     // Load saved credentials when the screen loads
     LaunchedEffect(Unit) {
@@ -269,43 +269,45 @@ fun LoginPage(navController: NavController) {
                         .padding(bottom = 16.dp)
                 )
 
-                Button(
-                    onClick = {
-                        if (username.isNotBlank() && password.isNotBlank()) {
-                            loginUser(username, password, { status, message, depot ->
-                                loginMessage = message
-                                messageColor =
-                                    if (status == "success") androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Red
-                                if (status == "success") {
-                                    // Save credentials on successful login
-                                    saveCredentials(context, username, password)
-
-                                    // Navigate to HomeScreen and pass username and depot
-                                    navController.navigate("homeScreen/${username}/${depot}")
-                                }
-                            }, loading)
-                        } else {
-                            loginMessage = "Please fill in all fields."
-                            messageColor = androidx.compose.ui.graphics.Color.Red
-                        }
-                    }, modifier = Modifier
+                Box(
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(48.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "Login")
-                }
-
-                // Show the loading indicator if the loading state is true
-                if (loading.value) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(), // Ensure the Box takes the full size
-                        contentAlignment = Alignment.Center // Center the LottieAnimation within the Box
-                    ) {
+                    if (loading.value) {
                         LottieAnimation(
                             composition = composition,
                             progress = { progress },
-                            modifier = Modifier.size(100.dp) // No need for align here
+                            modifier = Modifier.size(100.dp)
                         )
+                    } else {
+                        // Display the button when loading is false
+                        Button(
+                            onClick = {
+                                if (username.isNotBlank() && password.isNotBlank()) {
+                                    loginUser(username, password, { status, message, depot ->
+                                        loginMessage = message
+                                        messageColor =
+                                            if (status == "success") androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Red
+                                        if (status == "success") {
+                                            // Save credentials on successful login
+                                            saveCredentials(context, username, password)
+
+                                            // Navigate to HomeScreen and pass username and depot
+                                            navController.navigate("homeScreen/${username}/${depot}")
+                                        }
+                                    }, loading)
+                                } else {
+                                    loginMessage = "Please fill in all fields."
+                                    messageColor = androidx.compose.ui.graphics.Color.Red
+                                }
+                            }, modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text(text = "Login")
+                        }
                     }
                 }
 
