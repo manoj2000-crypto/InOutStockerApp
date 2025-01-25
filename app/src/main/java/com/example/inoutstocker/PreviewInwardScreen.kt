@@ -52,6 +52,7 @@ fun PreviewInwardScreen(
 
     var showModal by remember { mutableStateOf(false) }
     var modalContent by remember { mutableStateOf<List<String>>(emptyList()) }
+    val processedNumbers = remember { mutableStateListOf<String>() } // Track processed PRNs/THCs
 
     val sharedViewModel: SharedViewModel = viewModel()
 
@@ -80,7 +81,7 @@ fun PreviewInwardScreen(
                 .padding(paddingValues)
         ) {
             SectionTitle(title = "PRN:")
-            ItemList(items = prnData, onArrivalClick = { prn ->
+            ItemList(items = prnData, processedNumbers = processedNumbers, onArrivalClick = { prn ->
 
                 // Filter scannedItems based on LRNOs associated with the selected PRN
                 val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
@@ -93,13 +94,14 @@ fun PreviewInwardScreen(
                     depot,
                     filteredScannedItems
                 )
+                processedNumbers.add(prn)
             }, onShowClick = { lrnos ->
                 modalContent = lrnos
                 showModal = true
             })
 
             SectionTitle(title = "THC:")
-            ItemList(items = thcData, onArrivalClick = { thc ->
+            ItemList(items = thcData, processedNumbers = processedNumbers, onArrivalClick = { thc ->
 
                 // Filter scannedItems based on LRNOs associated with the selected THC
                 val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
@@ -112,6 +114,7 @@ fun PreviewInwardScreen(
                     depot,
                     filteredScannedItems
                 )
+                processedNumbers.add(thc)
             }, onShowClick = { lrnos ->
                 modalContent = lrnos
                 showModal = true
@@ -139,6 +142,7 @@ fun SectionTitle(title: String) {
 @Composable
 fun ItemList(
     items: List<Pair<String, List<String>>>,
+    processedNumbers: List<String>,
     onArrivalClick: (String) -> Unit,
     onShowClick: (List<String>) -> Unit
 ) {
@@ -148,6 +152,7 @@ fun ItemList(
             .padding(8.dp)
     ) {
         items(items) { (number, lrnos) ->
+            val isProcessed = processedNumbers.contains(number)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,7 +164,7 @@ fun ItemList(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Button(onClick = { onArrivalClick(number) }) {
+                        Button(onClick = { onArrivalClick(number) }, enabled = !isProcessed) {
                             Text("Arrival")
                         }
                         Button(onClick = { onShowClick(lrnos) }) {

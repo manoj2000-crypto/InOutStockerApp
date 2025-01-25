@@ -1,5 +1,7 @@
 package com.example.inoutstocker
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -20,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,6 +33,7 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +71,10 @@ fun FinalCalculationForInwardScreen(
 
     var totalQty by remember { mutableIntStateOf(0) }
     var totalWeight by remember { mutableDoubleStateOf(0.0) }
+
+    val isLoading = remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val showSuccessDialog = remember { mutableStateOf(false) }
 
     // Calculate TotalBagQty and TotalBoxQty from scannedItems
     LaunchedEffect(scannedItems) {
@@ -177,7 +186,8 @@ fun FinalCalculationForInwardScreen(
             Log.d("FinalCalculationScreen", "Hamali Type: $hamaliType")
 
             item {
-                TextField(value = totalAmount.toString(),
+                TextField(
+                    value = totalAmount.toString(),
                     onValueChange = {},
                     label = { Text("Total Amount") },
                     enabled = false,
@@ -187,7 +197,8 @@ fun FinalCalculationForInwardScreen(
             Log.d("FinalCalculationScreen", "Total Amount: $totalAmount")
 
             item {
-                TextField(value = deductionAmount,
+                TextField(
+                    value = deductionAmount,
                     onValueChange = { deductionAmount = it },
                     label = { Text("Deduction Amount") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -197,7 +208,8 @@ fun FinalCalculationForInwardScreen(
             Log.d("FinalCalculationScreen", "Deduction Amount: $deductionAmount")
 
             item {
-                TextField(value = finalAmount.toString(),
+                TextField(
+                    value = finalAmount.toString(),
                     onValueChange = {},
                     label = { Text("Final Amount") },
                     enabled = false,
@@ -209,7 +221,8 @@ fun FinalCalculationForInwardScreen(
             // Conditional Fields
             if (decodedPrnOrThc == "PRN") {
                 item {
-                    TextField(value = freight,
+                    TextField(
+                        value = freight,
                         onValueChange = { freight = it },
                         label = { Text("Freight") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -219,7 +232,8 @@ fun FinalCalculationForInwardScreen(
                 Log.d("FinalCalculationScreen", "Freight: $freight")
 
                 item {
-                    TextField(value = godownKeeperName,
+                    TextField(
+                        value = godownKeeperName,
                         onValueChange = { godownKeeperName = it },
                         label = { Text("Godown Keeper Name") },
                         modifier = Modifier.fillMaxWidth()
@@ -229,7 +243,8 @@ fun FinalCalculationForInwardScreen(
 
             } else if (decodedPrnOrThc == "THC") {
                 item {
-                    TextField(value = closingKm,
+                    TextField(
+                        value = closingKm,
                         onValueChange = { closingKm = it },
                         label = { Text("Closing KM") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -247,7 +262,8 @@ fun FinalCalculationForInwardScreen(
                 Log.d("FinalCalculationScreen", "Payment Mode: $paymentMode")
 
                 item {
-                    TextField(value = transactionId,
+                    TextField(
+                        value = transactionId,
                         onValueChange = { transactionId = it },
                         label = { Text("Transaction ID") },
                         modifier = Modifier.fillMaxWidth()
@@ -270,7 +286,8 @@ fun FinalCalculationForInwardScreen(
             }
 
             item {
-                TextField(value = reason,
+                TextField(
+                    value = reason,
                     onValueChange = { reason = it },
                     label = { Text("Reason") },
                     modifier = Modifier.fillMaxWidth()
@@ -278,31 +295,74 @@ fun FinalCalculationForInwardScreen(
             }
 
             item {
-                Button(
-                    onClick = {
-                        val processedItems = processScannedItems(scannedItems, reason)
-
-                        submitDataToServer(prnOrThc = prnOrThc,
-                            prn = prn,
-                            username = username,
-                            depot = depot,
-                            processedItems = processedItems,
-                            hamaliVendorName = hamaliVendorName,
-                            hamaliType = hamaliType,
-                            totalAmount = totalAmount,
-                            deductionAmount = deductionAmount,
-                            finalAmount = finalAmount,
-                            onSuccess = {
-                                Log.d("SubmitButton", "Data submitted successfully.")
-                                onBack() // Navigate back and remove the card in PreviewInwardScreen
-                            },
-                            onFailure = { error ->
-                                Log.e("SubmitButton", "Failed to submit data: $error")
-                            })
-                    }, modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
                 ) {
-                    Text("Submit")
+                    if (isLoading.value) {
+                        LottieAnimationView()
+                    } else {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    isLoading.value = true
+                                    try {
+                                        val processedItems =
+                                            processScannedItems(scannedItems, reason)
+
+                                        submitDataToServer(prnOrThc = prnOrThc,
+                                            prn = prn,
+                                            username = username,
+                                            depot = depot,
+                                            processedItems = processedItems,
+                                            hamaliVendorName = hamaliVendorName,
+                                            hamaliType = hamaliType,
+                                            totalAmount = totalAmount,
+                                            deductionAmount = deductionAmount,
+                                            finalAmount = finalAmount,
+                                            onSuccess = {
+                                                Log.d(
+                                                    "SubmitButton", "Data submitted successfully."
+                                                )
+                                                isLoading.value = false
+                                                showSuccessDialog.value = true
+//                                                onBack() // Navigate back and remove the card in PreviewInwardScreen
+                                            },
+                                            onFailure = { error ->
+                                                Log.e(
+                                                    "SubmitButton", "Failed to submit data: $error"
+                                                )
+                                                isLoading.value = false
+                                            })
+                                    } catch (e: Exception) {
+                                        Log.e("SubmitButton", "Exception: ${e.message}")
+                                        isLoading.value = false
+                                    }
+                                }
+                            }, modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Submit")
+                        }
+                    }
                 }
+
+                // Show success dialog if data submission is successful
+                if (showSuccessDialog.value) {
+                    AlertDialog(onDismissRequest = {
+                        showSuccessDialog.value = false
+                        onBack() // Navigate back and remove the card in PreviewInwardScreen
+                    },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showSuccessDialog.value = false
+                                onBack() // Navigate back and remove the card in PreviewInwardScreen
+                            }) {
+                                Text("OK")
+                            }
+                        },
+                        title = { Text("Success") },
+                        text = { Text("Data submitted successfully.") })
+                }
+
             }
         }
     })
@@ -574,19 +634,28 @@ fun submitDataToServer(
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
-            Log.e("OkHttp", "Request failed: ${e.message}")
-            onFailure("Request failed: ${e.message}")
+            // Ensure the callback is executed on the main thread
+            Handler(Looper.getMainLooper()).post {
+                Log.e("OkHttp", "Request failed: ${e.message}")
+                onFailure("Request failed: ${e.message}")
+            }
         }
 
         override fun onResponse(call: Call, response: Response) {
             if (response.isSuccessful) {
-                val responseBody = response.body?.string()
-                Log.d("OkHttp", "Response: $responseBody")
-                onSuccess()
+                // Ensure the callback is executed on the main thread
+                Handler(Looper.getMainLooper()).post {
+                    val responseBody = response.body?.string()
+                    Log.d("OkHttp", "Response: $responseBody")
+                    onSuccess()
+                }
             } else {
-                val errorMessage = response.message
-                Log.e("OkHttp", "Error: $errorMessage")
-                onFailure("Error: $errorMessage")
+                // Ensure the callback is executed on the main thread
+                Handler(Looper.getMainLooper()).post {
+                    val errorMessage = response.message
+                    Log.e("OkHttp", "Error: $errorMessage")
+                    onFailure("Error: $errorMessage")
+                }
             }
         }
     })
