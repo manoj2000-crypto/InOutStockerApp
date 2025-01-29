@@ -55,7 +55,36 @@ fun AppNavigation(
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
-            OutwardScreen(username, depot)
+            OutwardScreen(navController, username, depot)
+        }
+
+        composable("outwardScanScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
+
+            OutwardScanScreen(
+                navController = navController,
+                username = username,
+                depot = depot,
+                onPreview = {
+                    navController.navigate("previewOutwardScreen/$username/$depot")
+                },
+                sharedViewModel = sharedViewModel
+            )
+        }
+
+
+        composable("previewOutwardScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+
+            PreviewOutwardScreen(
+                sharedViewModel = sharedViewModel,
+                username = username,
+                depot = depot,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable("previewAuditScreen/{username}/{depot}") { backStackEntry ->
@@ -84,7 +113,13 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() },
                 navigateToFinalCalculation = { prnOrThc, prn, username, depot, scannedItems ->
                     val encodedScannedItems = java.net.URLEncoder.encode(
-                        scannedItems.joinToString(";") { "${it.first},${it.second.first},${it.second.second.joinToString(",")}" },
+                        scannedItems.joinToString(";") {
+                            "${it.first},${it.second.first},${
+                                it.second.second.joinToString(
+                                    ","
+                                )
+                            }"
+                        },
                         "UTF-8"
                     )
                     navController.navigate("finalCalculationScreen/$prnOrThc/$prn/$username/$depot/$encodedScannedItems")
