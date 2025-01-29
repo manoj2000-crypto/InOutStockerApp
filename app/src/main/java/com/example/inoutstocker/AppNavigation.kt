@@ -11,10 +11,12 @@ fun AppNavigation(
     navController: NavHostController, sharedViewModel: SharedViewModel = viewModel()
 ) {
     NavHost(navController = navController, startDestination = "login") {
+        //Navigation Starts from login page
         composable("login") {
             LoginPage(navController)
         }
 
+        //After Login this screen will shown to user with three buttons (Stock Audit, Inward, Outward)
         composable("homeScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
@@ -31,6 +33,7 @@ fun AppNavigation(
                 })
         }
 
+        //Audit screen starts from here and this will open common scanning CameraScanView utility with separate data for each feature.
         composable("auditScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
@@ -40,53 +43,7 @@ fun AppNavigation(
             }, sharedViewModel = sharedViewModel)
         }
 
-        composable("inwardScreen/{username}/{depot}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val depot = backStackEntry.arguments?.getString("depot") ?: ""
-            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
-
-            InwardScreen(navController, username, depot, onPreview = {
-                navController.navigate("previewInwardScreen/$username/$depot")
-            }, sharedViewModel = sharedViewModel)
-        }
-
-        composable("outwardScreen/{username}/{depot}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val depot = backStackEntry.arguments?.getString("depot") ?: ""
-            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
-
-            OutwardScreen(navController, username, depot)
-        }
-
-        composable("outwardScanScreen/{username}/{depot}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val depot = backStackEntry.arguments?.getString("depot") ?: ""
-            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
-
-            OutwardScanScreen(
-                navController = navController,
-                username = username,
-                depot = depot,
-                onPreview = {
-                    navController.navigate("previewOutwardScreen/$username/$depot")
-                },
-                sharedViewModel = sharedViewModel
-            )
-        }
-
-
-        composable("previewOutwardScreen/{username}/{depot}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val depot = backStackEntry.arguments?.getString("depot") ?: ""
-
-            PreviewOutwardScreen(
-                sharedViewModel = sharedViewModel,
-                username = username,
-                depot = depot,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
+        //Saving the Audited data on the server and user can able to go back and scan the remaining items also.
         composable("previewAuditScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
@@ -103,6 +60,19 @@ fun AppNavigation(
                 })
         }
 
+        //Inward screen this has two screens after this : inwardScreen->previewInwardScreen->finalCalculationScreen
+        //Inward means the Arrival process for PRN / THC
+        composable("inwardScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
+
+            InwardScreen(navController, username, depot, onPreview = {
+                navController.navigate("previewInwardScreen/$username/$depot")
+            }, sharedViewModel = sharedViewModel)
+        }
+
+        //Here after scanning the items we are segregating the LRNO into where they in which category like : PRN / THC if not both then Excess LR
         composable("previewInwardScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
@@ -119,13 +89,13 @@ fun AppNavigation(
                                     ","
                                 )
                             }"
-                        },
-                        "UTF-8"
+                        }, "UTF-8"
                     )
                     navController.navigate("finalCalculationScreen/$prnOrThc/$prn/$username/$depot/$encodedScannedItems")
                 })
         }
 
+        //After preview we are calculating the Hamali amount based on the items scanned based on their Qty and Weight.
         composable("finalCalculationScreen/{prnOrThc}/{prn}/{username}/{depot}/{scannedItems}") { backStackEntry ->
             val prnOrThc = backStackEntry.arguments?.getString("prnOrThc") ?: ""
             val prn = backStackEntry.arguments?.getString("prn") ?: ""
@@ -143,6 +113,40 @@ fun AppNavigation(
                 username = username,
                 depot = depot,
                 scannedItems = scannedItems,
+                onBack = { navController.popBackStack() })
+        }
+
+        //Outward screen this has two screens after this :outwardScreen ->  outwardScanScreen->previewOutwardScreen
+        //Outward means just like creating DRS or THC from loading sheet.
+        composable("outwardScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
+
+            OutwardScreen(navController, username, depot)
+        }
+
+        //This will show the scanning options with scan camera view.
+        composable("outwardScanScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
+
+            OutwardScanScreen(
+                navController = navController, username = username, depot = depot, onPreview = {
+                    navController.navigate("previewOutwardScreen/$username/$depot")
+                }, sharedViewModel = sharedViewModel
+            )
+        }
+
+        //In this screen user will able to review its scanned item and then go for the Final calculation.
+        composable("previewOutwardScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+
+            PreviewOutwardScreen(sharedViewModel = sharedViewModel,
+                username = username,
+                depot = depot,
                 onBack = { navController.popBackStack() })
         }
 
