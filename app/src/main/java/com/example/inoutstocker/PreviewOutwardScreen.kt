@@ -24,10 +24,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 
 @SuppressLint("SourceLockedOrientationActivity")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +49,7 @@ fun PreviewOutwardScreen(
     sharedViewModel: SharedViewModel = viewModel(),
     username: String,
     depot: String,
+    loadingSheetNo: String,
     onBack: () -> Unit
 ) {
     // Lock orientation to portrait
@@ -47,6 +61,23 @@ fun PreviewOutwardScreen(
     sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
     val outwardScannedData = sharedViewModel.scannedItems
+
+    val drsLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LSD") }
+    val thcLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LST") }
+
+    var drsLrnos by remember { mutableStateOf(emptyList<String>()) }
+    var thcLrnos by remember { mutableStateOf(emptyList<String>()) }
+    val outwardScannedLrnos = outwardScannedData.map { it.first }
+
+    LaunchedEffect(loadingSheetNo) {
+        drsLrnos = fetchLrnosFromServer(drsLoadingSheets, "fetch_drs_lrnos.php")
+        thcLrnos = fetchLrnosFromServer(thcLoadingSheets, "fetch_thc_lrnos.php")
+    }
+
+    val excessLrnos = outwardScannedLrnos.filter { it !in drsLrnos && it !in thcLrnos }
+
+
+    Log.d("PreviewOutwardScreen", "Received LoadingSheetNo: $loadingSheetNo")
 
     Log.d("PreviewOutwardScreen", "Outward Scanned Data: $outwardScannedData")
 
@@ -76,9 +107,62 @@ fun PreviewOutwardScreen(
                     }
                 }
             }
+
+            Text("DRS LR Numbers", style = MaterialTheme.typography.headlineSmall)
+            LazyColumn {
+                items(drsLrnos) { lrno -> Text("LRNO: $lrno") }
+            }
+
+            Text("THC LR Numbers", style = MaterialTheme.typography.headlineSmall)
+            LazyColumn {
+                items(thcLrnos) { lrno -> Text("LRNO: $lrno") }
+            }
+
+            Text("Excess LR Numbers", style = MaterialTheme.typography.headlineSmall)
+            LazyColumn {
+                items(excessLrnos) { lrno -> Text("LRNO: $lrno", color = Color.Red) }
+            }
+
         }
     }
 }
+
+private val client = OkHttpClient()
+suspend fun fetchLrnosFromServer(loadingSheets: List<String>, endpoint: String): List<String> {
+    if (loadingSheets.isEmpty()) return emptyList()
+
+    val url = "https://vtc3pl.com/$endpoint"
+    val requestBody =
+        FormBody.Builder().add("loadingSheetNos", loadingSheets.joinToString(",")).build()
+
+    val request = Request.Builder().url(url).post(requestBody).build()
+
+    return try {
+        withContext(Dispatchers.IO) {
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e("PreviewOutwardScreen", "Server Error: ${response.code}")
+                return@withContext emptyList()
+            }
+
+            val responseBody = response.body?.string()
+            if (responseBody.isNullOrEmpty()) {
+                Log.e("PreviewOutwardScreen", "Empty response body")
+                return@withContext emptyList()
+            }
+
+            Log.d("PreviewOutwardScreen", "Response: $responseBody")
+
+            // Parse JSON response
+            val jsonArray = JSONArray(responseBody)
+            List(jsonArray.length()) { index -> jsonArray.getString(index) }
+        }
+    } catch (e: Exception) {
+        Log.e("PreviewOutwardScreen", "Error fetching LRNOs: ${e.message}")
+        emptyList()
+    }
+}
+
 
 @Composable
 fun OutwardItem(lrno: String, pkgNo: Int, scannedBoxes: List<Int>) {

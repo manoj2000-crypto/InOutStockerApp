@@ -259,6 +259,9 @@ fun TableView(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Collect all loadingSheetNo for this group
+                    val loadingSheetNos = rows.joinToString(",") { it.loadingSheetNo }
+
                     // Add the "Submit" button
                     Box(
                         modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
@@ -266,7 +269,7 @@ fun TableView(
                         Button(onClick = {
                             // Handle Submit button click here
                             Log.d("TableView", "Submit clicked for Group Code: $groupCode")
-                            navController.navigate("outwardScanScreen/$username/$depot") // Navigate to OutwardScanScreen
+                            navController.navigate("outwardScanScreen/$username/$depot/$loadingSheetNos") // Navigate to OutwardScanScreen
                         }) {
                             Text(text = "Submit")
                         }

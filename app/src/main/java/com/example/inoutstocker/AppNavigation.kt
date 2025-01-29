@@ -127,26 +127,30 @@ fun AppNavigation(
         }
 
         //This will show the scanning options with scan camera view.
-        composable("outwardScanScreen/{username}/{depot}") { backStackEntry ->
+        composable("outwardScanScreen/{username}/{depot}/{loadingSheetNo}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
+
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
             OutwardScanScreen(
-                navController = navController, username = username, depot = depot, onPreview = {
-                    navController.navigate("previewOutwardScreen/$username/$depot")
+                navController = navController, username = username, depot = depot, loadingSheetNo = loadingSheetNo, onPreview = {
+                    navController.navigate("previewOutwardScreen/$username/$depot/$loadingSheetNo")
                 }, sharedViewModel = sharedViewModel
             )
         }
 
         //In this screen user will able to review its scanned item and then go for the Final calculation.
-        composable("previewOutwardScreen/{username}/{depot}") { backStackEntry ->
+        composable("previewOutwardScreen/{username}/{depot}/{loadingSheetNo}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
 
             PreviewOutwardScreen(sharedViewModel = sharedViewModel,
                 username = username,
                 depot = depot,
+                loadingSheetNo = loadingSheetNo,
                 onBack = { navController.popBackStack() })
         }
 

@@ -2,6 +2,7 @@ package com.example.inoutstocker
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ fun OutwardScanScreen(
     navController: NavController,
     username: String,
     depot: String,
+    loadingSheetNo: String,
     onPreview: () -> Unit,
     sharedViewModel: SharedViewModel
 ) {
@@ -37,6 +39,9 @@ fun OutwardScanScreen(
 
     // State to track which view to display
     var scanMode by remember { mutableStateOf<String?>(null) }
+
+    // Use loadingSheetNo as needed
+    Log.d("OutwardScanScreen", "Received LoadingSheetNo: $loadingSheetNo")
 
     Scaffold { paddingValues ->
         Column(
