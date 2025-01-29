@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.google.gson.Gson
 
 @Composable
 fun AppNavigation(
@@ -135,9 +136,14 @@ fun AppNavigation(
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
             OutwardScanScreen(
-                navController = navController, username = username, depot = depot, loadingSheetNo = loadingSheetNo, onPreview = {
+                navController = navController,
+                username = username,
+                depot = depot,
+                loadingSheetNo = loadingSheetNo,
+                onPreview = {
                     navController.navigate("previewOutwardScreen/$username/$depot/$loadingSheetNo")
-                }, sharedViewModel = sharedViewModel
+                },
+                sharedViewModel = sharedViewModel
             )
         }
 
@@ -151,6 +157,32 @@ fun AppNavigation(
                 username = username,
                 depot = depot,
                 loadingSheetNo = loadingSheetNo,
+                onBack = { navController.popBackStack() })
+        }
+
+        // Outward Final Calculation Screen
+        composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalQty}/{totalWeight}/{outwardScannedDataJson}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
+            val totalQty = backStackEntry.arguments?.getString("totalQty")?.toIntOrNull() ?: 0
+            val totalWeight =
+                backStackEntry.arguments?.getString("totalWeight")?.toDoubleOrNull() ?: 0.0
+            val outwardScannedDataJson =
+                backStackEntry.arguments?.getString("outwardScannedDataJson") ?: ""
+
+            // Deserialize the JSON string into a list of outward scanned data
+            val gson = Gson()
+            val outwardScannedData =
+                gson.fromJson(outwardScannedDataJson, Array<OutwardScannedData>::class.java)
+                    .toList()
+
+            FinalCalculationForOutwardScreen(username = username,
+                depot = depot,
+                loadingSheetNo = loadingSheetNo,
+                totalQty = totalQty,
+                totalWeight = totalWeight,
+                outwardScannedData = outwardScannedData,
                 onBack = { navController.popBackStack() })
         }
 
