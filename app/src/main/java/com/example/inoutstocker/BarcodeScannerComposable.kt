@@ -1,5 +1,6 @@
 package com.example.inoutstocker
 
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
@@ -7,6 +8,7 @@ import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +50,18 @@ fun BarcodeScanner(
     var cameraControl: CameraControl? by remember { mutableStateOf(null) }
     var isFlashlightOn by remember { mutableStateOf(false) }
     var isCameraOn by remember { mutableStateOf(true) }
+    val previewView = remember { androidx.camera.view.PreviewView(context) }
+
+    val cameraManager =
+        remember { context.getSystemService(android.content.Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager }
+    val backCameraId = remember {
+        cameraManager.cameraIdList.firstOrNull { id ->
+            val characteristics = cameraManager.getCameraCharacteristics(id)
+            val lensFacing =
+                characteristics.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING)
+            lensFacing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -56,12 +71,12 @@ fun BarcodeScanner(
     }
 
     Box(modifier = modifier) {
-        AndroidView(factory = { ctx ->
-            val previewView = androidx.camera.view.PreviewView(ctx)
+        if (isCameraOn) {
+            AndroidView(factory = { previewView }, modifier = Modifier.matchParentSize())
 
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
-                cameraProvider.unbindAll() // Unbind all use cases before rebinding
+                cameraProvider.unbindAll()
 
                 val preview = androidx.camera.core.Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
@@ -95,76 +110,71 @@ fun BarcodeScanner(
                 )
                 cameraControl = camera.cameraControl
             }, ContextCompat.getMainExecutor(context))
-
-            previewView
-        })
-        // Controls for Flashlight, Camera On/Off, and Camera Toggle
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp), contentAlignment = Alignment.BottomEnd
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        } else {
+            // Show a black screen when the camera is off
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
             ) {
-                // Flashlight Toggle
-                val flashlightIcon: Painter = if (isFlashlightOn) {
-                    painterResource(id = R.drawable.flashlight_off_24px)
-                } else {
-                    painterResource(id = R.drawable.flashlight_on_24px)
-                }
-                Image(
-                    painter = flashlightIcon,
-                    contentDescription = "Flashlight Toggle",
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clickable {
-                            isFlashlightOn = !isFlashlightOn
-                            cameraControl?.enableTorch(isFlashlightOn)
-                        },
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                )
-
-                // Camera Off Toggle
-                val cameraOffIcon = painterResource(id = R.drawable.no_photography_24px)
-                Image(
-                    painter = cameraOffIcon,
-                    contentDescription = "Camera Off Toggle",
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clickable {
-                            isCameraOn = false
-                            cameraProviderFuture
-                                .get()
-                                .unbindAll() // Unbind camera
-                        },
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                )
-
-                // Camera On Toggle
-                val cameraOnIcon = painterResource(id = R.drawable.photo_camera_24px)
-                Image(
-                    painter = cameraOnIcon,
-                    contentDescription = "Camera On Toggle",
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clickable {
-                            isCameraOn = true
-                            // Rebind camera when turned back on
-                            cameraProviderFuture
-                                .get()
-                                .bindToLifecycle(
-                                    lifecycleOwner,
-                                    CameraSelector.DEFAULT_BACK_CAMERA,
-                                    androidx.camera.core.Preview
-                                        .Builder()
-                                        .build()
-                                )
-                        },
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                )
+                // Placeholder UI can be added here if needed
             }
+        }
+
+        // Controls for Flashlight and Camera On/Off
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomEnd) // Align to the bottom-right corner
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Flashlight Toggle
+            val flashlightIcon: Painter = if (isFlashlightOn) {
+                painterResource(id = R.drawable.flashlight_off_24px)
+            } else {
+                painterResource(id = R.drawable.flashlight_on_24px)
+            }
+            Image(
+                painter = flashlightIcon,
+                contentDescription = "Flashlight Toggle",
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable {
+                        if (backCameraId != null) {
+                            isFlashlightOn = !isFlashlightOn
+                            try {
+                                cameraManager.setTorchMode(backCameraId, isFlashlightOn)
+                            } catch (e: Exception) {
+                                Log.e("Flashlight", "Error toggling flashlight", e)
+                            }
+                        } else {
+                            Log.i("Flashlight", "Back camera not found.")
+                        }
+                    },
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+            )
+
+            // Camera On/Off Toggle
+            val cameraIcon: Painter = if (isCameraOn) {
+                painterResource(id = R.drawable.no_photography_24px)
+            } else {
+                painterResource(id = R.drawable.photo_camera_24px)
+            }
+            Image(
+                painter = cameraIcon,
+                contentDescription = if (isCameraOn) "Turn Camera Off" else "Turn Camera On",
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable {
+                        isCameraOn = !isCameraOn
+                        if (!isCameraOn) {
+                            cameraProviderFuture.get().unbindAll()
+                        }
+                    },
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+            )
         }
     }
 }

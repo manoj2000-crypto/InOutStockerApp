@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,8 +71,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .padding(bottom = 8.dp),
-            contentAlignment = Alignment.Center
+                .padding(bottom = 8.dp)
         ) {
             if (isLoading.value) {
                 val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.simple_loading_animation))
@@ -81,26 +81,23 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                         .align(Alignment.Center)
                 )
             } else {
-                BarcodeScanner(modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp), // Dynamic height passed here
-                    onBarcodeScanned = { data ->
-                        coroutineScope.launch {
-                            isLoading.value = true
-                            // Play beep sound using SoundPool
-                            soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
+                BarcodeScanner(modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
+                    coroutineScope.launch {
+                        isLoading.value = true
+                        // Play beep sound using SoundPool
+                        soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
 
-                            delay(2000) // Pause scanner for 2 seconds
-                            isLoading.value = false
+                        delay(2000) // Pause scanner for 2 seconds
+                        isLoading.value = false
 
-                            val parsedData = parseScannedData(data)
-                            parsedData?.let { (lrno, pkgsNo, boxNo) ->
-                                sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
-                                scannedData.value = data
-                                Log.d("AuditScreen", "Scanned Data: $data")
-                            }
+                        val parsedData = parseScannedData(data)
+                        parsedData?.let { (lrno, pkgsNo, boxNo) ->
+                            sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
+                            scannedData.value = data
+                            Log.d("AuditScreen", "Scanned Data: $data")
                         }
-                    })
+                    }
+                })
             }
         }
 
