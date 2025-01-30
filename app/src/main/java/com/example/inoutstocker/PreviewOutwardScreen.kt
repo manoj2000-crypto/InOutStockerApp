@@ -2,8 +2,10 @@ package com.example.inoutstocker
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,8 +38,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -56,6 +58,7 @@ import java.io.IOException
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreviewOutwardScreen(
+    navController: NavHostController,
     sharedViewModel: SharedViewModel = viewModel(),
     username: String,
     depot: String,
@@ -83,9 +86,6 @@ fun PreviewOutwardScreen(
     var totalQtyScanned by remember { mutableStateOf(0) }
     var isDataFetched by remember { mutableStateOf(false) }
 
-    // Create NavController
-    val navController = rememberNavController()
-
     LaunchedEffect(loadingSheetNo) {
         val drsResults =
             fetchLrnosFromServer(outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos.php")
@@ -108,112 +108,126 @@ fun PreviewOutwardScreen(
             }
         })
     }) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp) // This ensures some space between items
         ) {
-            Text("Scanned LR Numbers", style = MaterialTheme.typography.headlineSmall)
-            Spacer(modifier = Modifier.height(8.dp))
+            item {
+                Text("Scanned LR Numbers", style = MaterialTheme.typography.headlineSmall)
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
-            if (outwardScannedData.isEmpty()) {
-                Text("No data available.", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn {
-                    items(outwardScannedData) { (lrno, pkgNoPair) ->
+            item {
+                if (outwardScannedData.isEmpty()) {
+                    Text("No data available.", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    outwardScannedData.forEach { (lrno, pkgNoPair) ->
                         val (pkgNo, scannedBoxes) = pkgNoPair
                         OutwardItem(lrno, pkgNo, scannedBoxes)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Display categorized LR numbers under each Loading Sheet
             categorizedLrnos.forEach { (loadingSheet, lrnos) ->
-                Text("Loading Sheet: $loadingSheet", style = MaterialTheme.typography.headlineSmall)
-                LazyColumn {
-                    items(lrnos) { lrno -> Text("LRNO: $lrno") }
+                item {
+                    Text(
+                        "Loading Sheet: $loadingSheet",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    lrnos.forEach { lrno ->
+                        Text("LRNO: $lrno")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Display excess LR numbers that don't belong to any Loading Sheet
             if (excessLrnos.isNotEmpty()) {
-                Text(
-                    "Excess LR Numbers",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.Red
-                )
-                LazyColumn {
-                    items(excessLrnos) { lrno -> Text("LRNO: $lrno", color = Color.Red) }
+                item {
+                    Text(
+                        "Excess LR Numbers",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.Red
+                    )
+                    excessLrnos.forEach { lrno ->
+                        Text("LRNO: $lrno", color = Color.Red)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Get Data Button and Loader
-            Button(
-                onClick = {
-                    isLoading = true
-                    fetchWeightsFromServer(
-                        categorizedLrnos, excessLrnos, outwardScannedData
-                    ) { totalQty, weight -> // Pass scannedItems
-                        totalWeight = weight
-                        totalQtyScanned = totalQty // Store totalQty if needed
-                        isLoading = false
-
-                        // Enable the next button only if valid data is fetched
-                        isDataFetched = totalQty > 0 && weight > 0.0
-                    }
-
-                }, modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Get Data")
+            item {
+                Button(
+                    onClick = {
+                        isLoading = true
+                        fetchWeightsFromServer(
+                            categorizedLrnos, excessLrnos, outwardScannedData
+                        ) { totalQty, weight ->
+                            totalWeight = weight
+                            totalQtyScanned = totalQty
+                            isLoading = false
+                            isDataFetched = totalQty > 0 && weight > 0.0
+                        }
+                    }, modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get Data")
+                }
             }
 
             if (isLoading) {
-                Spacer(modifier = Modifier.height(8.dp))
-                CircularProgressIndicator()
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CircularProgressIndicator()
+                }
             }
 
             if (totalQtyScanned > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Total Quantity: $totalQtyScanned",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Green
-                )
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Total Quantity: $totalQtyScanned",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Green
+                    )
+                }
             }
 
             if (totalWeight > 0.0) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Total Weight: $totalWeight",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Green
-                )
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Total Weight: $totalWeight",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Green
+                    )
+                }
             }
 
             // Show the button only if data is fetched
             if (isDataFetched) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        // Serialize outwardScannedData
-                        val gson = Gson()
-                        val outwardScannedDataJson = gson.toJson(outwardScannedData)
-
-                        // Navigate to Final Calculation Screen
-                        navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$totalWeight/$outwardScannedDataJson")
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Proceed to Final Calculation")
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            sharedViewModel.setOutwardScannedData(outwardScannedData)
+                            val encodedTotalWeight = Uri.encode(totalWeight.toString())
+                            navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight")
+                        }, modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Proceed to Final Calculation")
+                    }
                 }
             }
-
         }
     }
 }

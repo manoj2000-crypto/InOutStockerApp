@@ -50,4 +50,14 @@ class SharedViewModel : ViewModel() {
             FeatureType.AUDIT -> auditScannedItems.clear()
         }
     }
+
+    // ---- New Methods for Outward Scanned Data ----
+    private val _outwardScannedData = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    val outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>> get() = _outwardScannedData
+
+    fun setOutwardScannedData(data: List<Pair<String, Pair<Int, List<Int>>>>) {
+        _outwardScannedData.clear()
+        _outwardScannedData.addAll(data)
+    }
+
 }
