@@ -63,6 +63,7 @@ fun PreviewOutwardScreen(
     username: String,
     depot: String,
     loadingSheetNo: String,
+    groupCode: String,
     onBack: () -> Unit
 ) {
     // Lock orientation to portrait
@@ -96,6 +97,8 @@ fun PreviewOutwardScreen(
         categorizedLrnos = drsResults.first + thcResults.first
         excessLrnos = drsResults.second + thcResults.second
     }
+
+    Log.d("PreviewOutwardScreen", "Received Group Code: $groupCode")
 
     Log.d("PreviewOutwardScreen", "Received LoadingSheetNo: $loadingSheetNo")
 
@@ -221,7 +224,8 @@ fun PreviewOutwardScreen(
                         onClick = {
                             sharedViewModel.setOutwardScannedData(outwardScannedData)
                             val encodedTotalWeight = Uri.encode(totalWeight.toString())
-                            navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight")
+                            val encodedGroupCode = Uri.encode(groupCode)
+                            navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight/$encodedGroupCode")
                         }, modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Proceed to Final Calculation")
@@ -321,6 +325,8 @@ suspend fun fetchLrnosFromServer(
             val jsonObject = JSONObject(responseBody)
             val categorizedLrnos = mutableMapOf<String, List<String>>()
             val excessLrnos = mutableListOf<String>()
+            val allLrnos = mutableSetOf<String>()  // Track all LRNOs to ensure uniqueness
+            val categorizedSet = mutableSetOf<String>() // Track categorized LRNOs
 
             // Extract categorized LR numbers
             val keys = jsonObject.keys()
@@ -333,10 +339,17 @@ suspend fun fetchLrnosFromServer(
                     excessLrnos.addAll(lrnosList)
                 } else {
                     categorizedLrnos[key] = lrnosList
+                    categorizedSet.addAll(lrnosList) // Track categorized LRNOs
                 }
+                allLrnos.addAll(lrnosList) // Track all LRNOs
             }
 
-            Pair(categorizedLrnos, excessLrnos)
+            // Remove excess LRNOs that already exist in categorized LRNOs
+            val uniqueExcessLrnos = excessLrnos.filterNot { it in categorizedSet }.toSet()
+
+            Pair(categorizedLrnos, uniqueExcessLrnos.toList()) // Ensure excess LRNOs are unique
+
+//            Pair(categorizedLrnos, excessLrnos)
         }
     } catch (e: Exception) {
         Log.e("PreviewOutwardScreen", "Error fetching LRNOs: ${e.message}")

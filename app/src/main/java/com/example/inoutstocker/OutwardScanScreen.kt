@@ -29,6 +29,7 @@ fun OutwardScanScreen(
     username: String,
     depot: String,
     loadingSheetNo: String,
+    groupCode: String,
     onPreview: () -> Unit,
     sharedViewModel: SharedViewModel
 ) {
@@ -40,7 +41,8 @@ fun OutwardScanScreen(
     // State to track which view to display
     var scanMode by remember { mutableStateOf<String?>(null) }
 
-    // Use loadingSheetNo as needed
+    // Use loadingSheetNo and Group code as needed
+    Log.d("OutwardScanScreen", "Received Group Code: $groupCode")
     Log.d("OutwardScanScreen", "Received LoadingSheetNo: $loadingSheetNo")
 
     Scaffold { paddingValues ->

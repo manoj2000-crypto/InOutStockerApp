@@ -7,7 +7,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 
-
 @Composable
 fun AppNavigation(
     navController: NavHostController, sharedViewModel: SharedViewModel = viewModel()
@@ -123,16 +122,21 @@ fun AppNavigation(
         composable("outwardScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
+
+            // Clear only Outward-related data
+            sharedViewModel.clearOutwardData()
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
-            OutwardScreen(navController, username, depot)
+            OutwardScreen(navController, username, depot, sharedViewModel)
         }
 
         //This will show the scanning options with scan camera view.
-        composable("outwardScanScreen/{username}/{depot}/{loadingSheetNo}") { backStackEntry ->
+        composable("outwardScanScreen/{username}/{depot}/{loadingSheetNo}/{groupCode}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
+            val groupCode =
+                backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
 
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
@@ -141,43 +145,54 @@ fun AppNavigation(
                 username = username,
                 depot = depot,
                 loadingSheetNo = loadingSheetNo,
+                groupCode = groupCode,
                 onPreview = {
-                    navController.navigate("previewOutwardScreen/$username/$depot/$loadingSheetNo")
+                    // Encode groupCode to ensure it's safely passed
+                    val encodedGroupCode = Uri.encode(groupCode)
+                    navController.navigate("previewOutwardScreen/$username/$depot/$loadingSheetNo/$encodedGroupCode")
                 },
                 sharedViewModel = sharedViewModel
             )
         }
 
         //In this screen user will able to review its scanned item and then go for the Final calculation.
-        composable("previewOutwardScreen/{username}/{depot}/{loadingSheetNo}") { backStackEntry ->
+        composable("previewOutwardScreen/{username}/{depot}/{loadingSheetNo}/{groupCode}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
+            val groupCode =
+                backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
 
             PreviewOutwardScreen(navController = navController,
                 sharedViewModel = sharedViewModel,
                 username = username,
                 depot = depot,
                 loadingSheetNo = loadingSheetNo,
+                groupCode = groupCode,
                 onBack = { navController.popBackStack() })
         }
 
         // Outward Final Calculation Screen
-        composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalQty}/{totalWeight}") { backStackEntry ->
+        composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalQty}/{totalWeight}/{groupCode}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
             val totalQty = backStackEntry.arguments?.getString("totalQty")?.toIntOrNull() ?: 0
             val totalWeight = backStackEntry.arguments?.getString("totalWeight")
                 ?.let { Uri.decode(it).toDoubleOrNull() } ?: 0.0
+            val groupCode =
+                backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
 
-            FinalCalculationForOutwardScreen(username = username,
+            FinalCalculationForOutwardScreen(
+                username = username,
                 depot = depot,
                 loadingSheetNo = loadingSheetNo,
                 totalQty = totalQty,
                 totalWeight = totalWeight,
+                groupCode = groupCode,
                 sharedViewModel = sharedViewModel,
-                onBack = { navController.popBackStack() })
+                navController = navController
+            )
         }
 
     }

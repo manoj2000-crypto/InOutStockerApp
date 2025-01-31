@@ -1,8 +1,14 @@
 package com.example.inoutstocker
 
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class SharedViewModel : ViewModel() {
     enum class FeatureType { INWARD, OUTWARD, AUDIT }
@@ -51,6 +57,12 @@ class SharedViewModel : ViewModel() {
         }
     }
 
+    fun clearOutwardData() {
+        outwardScannedItems.clear() // Clears only Outward Scanned Items
+        _outwardScannedData.clear() // Clears only Outward-specific scanned data
+//        tableData = emptyList() // Clears Outward-specific table data
+    }
+
     // ---- New Methods for Outward Scanned Data ----
     private val _outwardScannedData = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
     val outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>> get() = _outwardScannedData
@@ -60,4 +72,30 @@ class SharedViewModel : ViewModel() {
         _outwardScannedData.addAll(data)
     }
 
+    var fromDate by mutableStateOf(getPreviousDate()) // Default: Previous Date
+    var toDate by mutableStateOf(getCurrentDate())   // Default: Current Date
+    var tableData by mutableStateOf<List<TableRowData>>(emptyList())
+
+    fun setDates(from: String, to: String) {
+        fromDate = from
+        toDate = to
+    }
+
+    fun updateTableData(data: List<TableRowData>) {
+        tableData = data
+    }
+
+}
+
+// Utility Functions for Default Dates
+fun getCurrentDate(): String {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+    return sdf.format(Date())
+}
+
+fun getPreviousDate(): String {
+    val calendar = Calendar.getInstance()
+    calendar.add(Calendar.DAY_OF_MONTH, -1) // Subtract one day
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+    return sdf.format(calendar.time)
 }

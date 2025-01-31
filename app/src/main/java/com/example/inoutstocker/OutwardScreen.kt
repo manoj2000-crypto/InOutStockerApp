@@ -1,6 +1,7 @@
 package com.example.inoutstocker
 
 import android.app.DatePickerDialog
+import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -54,16 +55,21 @@ import java.io.IOException
 import java.util.Calendar
 
 @Composable
-fun OutwardScreen(navController: NavController, username: String, depot: String) {
+fun OutwardScreen(
+    navController: NavController,
+    username: String,
+    depot: String,
+    sharedViewModel: SharedViewModel
+) {
     val scannedData = remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
-    var fromDate by remember { mutableStateOf("") }
-    var toDate by remember { mutableStateOf("") }
+    var fromDate by remember { mutableStateOf(sharedViewModel.fromDate) }
+    var toDate by remember { mutableStateOf(sharedViewModel.toDate) }
     var number by remember { mutableStateOf("") }
-    var tableData by remember { mutableStateOf<List<TableRowData>>(emptyList()) }
+    var tableData by remember { mutableStateOf(sharedViewModel.tableData) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var showTable by remember { mutableStateOf(false) }
+    var showTable by remember { mutableStateOf(sharedViewModel.tableData.isNotEmpty()) }
 
     val calendar = Calendar.getInstance()
     val context = LocalContext.current
@@ -173,6 +179,8 @@ fun OutwardScreen(navController: NavController, username: String, depot: String)
                         isLoading = false
                         result.onSuccess { data ->
                             tableData = data
+                            sharedViewModel.updateTableData(data) // Save fetched data
+                            sharedViewModel.setDates(fromDate, toDate) // Save dates
                             showTable = true
                         }.onFailure { error ->
                             errorMessage = error.message
@@ -267,9 +275,10 @@ fun TableView(
                         modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
                     ) {
                         Button(onClick = {
+                            val encodedGroupCode = Uri.encode(groupCode)
                             // Handle Submit button click here
                             Log.d("TableView", "Submit clicked for Group Code: $groupCode")
-                            navController.navigate("outwardScanScreen/$username/$depot/$loadingSheetNos") // Navigate to OutwardScanScreen
+                            navController.navigate("outwardScanScreen/$username/$depot/$loadingSheetNos/$encodedGroupCode") // Navigate to OutwardScanScreen
                         }) {
                             Text(text = "Submit")
                         }

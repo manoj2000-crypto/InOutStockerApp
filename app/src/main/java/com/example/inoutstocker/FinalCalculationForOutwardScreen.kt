@@ -1,5 +1,8 @@
 package com.example.inoutstocker
 
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +27,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,8 +48,9 @@ fun FinalCalculationForOutwardScreen(
     loadingSheetNo: String,
     totalQty: Int,
     totalWeight: Double,
+    groupCode: String,
     sharedViewModel: SharedViewModel,
-    onBack: () -> Unit
+    navController: NavController
 ) {
     val outwardScannedData = sharedViewModel.outwardScannedData
     var totalAmount by remember { mutableIntStateOf(0) }
@@ -73,6 +89,8 @@ fun FinalCalculationForOutwardScreen(
         finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
     }
 
+    Log.d("FinalCalculationForOutwardScreen", "Received Group Code: $groupCode")
+
     Scaffold(topBar = {
         TopAppBar(title = { Text("Final Calculation") })
     }) { paddingValues ->
@@ -88,7 +106,7 @@ fun FinalCalculationForOutwardScreen(
             item { Text("Loading Sheet No: $loadingSheetNo") }
             item { Text("Total Quantity: $totalQty") }
             item { Text("Total Weight: $totalWeight") }
-//            item { Text("Outward Scanned Data: $outwardScannedData") }
+            item { Text("Outward Scanned Data: $outwardScannedData") }
             // Hamali Vendor Dropdown
             item {
                 HamaliVendorDropdown(
@@ -143,8 +161,23 @@ fun FinalCalculationForOutwardScreen(
                 ) {
                     Button(
                         onClick = {
-                            // Submit button logic
-                            onBack() // navigate back
+                            submitFinalCalculation(username = username,
+                                depot = depot,
+                                loadingSheetNo = loadingSheetNo,
+                                totalQty = totalQty,
+                                totalWeight = totalWeight,
+                                groupCode = groupCode,
+                                totalAmount = totalAmount,
+                                deductionAmount = deductionAmount.toIntOrNull() ?: 0,
+                                finalAmount = finalAmount,
+                                hamaliVendorName = hamaliVendorName,
+                                hamaliType = hamaliType,
+                                outwardScannedData = outwardScannedData,
+                                navController = navController,
+                                sharedViewModel = sharedViewModel,
+                                onFailure = { error ->
+                                    Log.e("FinalCalculation", "Error: $error")
+                                })
                         }, modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Submit")
@@ -155,7 +188,106 @@ fun FinalCalculationForOutwardScreen(
     }
 }
 
-// Calculate Total Amount (implement based on your outward logic)
+fun submitFinalCalculation(
+    username: String,
+    depot: String,
+    loadingSheetNo: String,
+    totalQty: Int,
+    totalWeight: Double,
+    groupCode: String,
+    totalAmount: Int,
+    deductionAmount: Int,
+    finalAmount: Int,
+    hamaliVendorName: String,
+    hamaliType: String,
+    outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>>,
+    navController: NavController,
+    sharedViewModel: SharedViewModel,
+    onFailure: (String) -> Unit
+) {
+    val client = OkHttpClient()
+    val url =
+        "https://vtc3pl.com/final_outward_calculation.php"
+
+    val jsonRequest = JSONObject().apply {
+        put("username", username)
+        put("depot", depot)
+        put("loadingSheetNo", loadingSheetNo)
+        put("totalQty", totalQty)
+        put("totalWeight", totalWeight)
+        put("groupCode", groupCode)
+        put("totalAmount", totalAmount)
+        put("deductionAmount", deductionAmount)
+        put("finalAmount", finalAmount)
+        put("hamaliVendorName", hamaliVendorName)
+        put("hamaliType", hamaliType)
+
+        val scannedDataArray = JSONArray()
+        outwardScannedData.forEach { (lrno, pkgData) ->
+            val (pkgNo, scannedBoxes) = pkgData
+            val scannedItemJson = JSONObject().apply {
+                put("LRNO", lrno)
+                put("TotalPkgNo", pkgNo)
+                put("ScannedBoxes", JSONArray(scannedBoxes))
+            }
+            scannedDataArray.put(scannedItemJson)
+        }
+        put("outwardScannedData", scannedDataArray)
+    }
+
+    val requestBody =
+        jsonRequest.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+
+    val request = Request.Builder().url(url).post(requestBody).build()
+
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("FinalCalculation", "Request failed: ${e.message}")
+            onFailure("Failed to connect to server")
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            response.use {
+                if (!it.isSuccessful) {
+                    Log.e("FinalCalculation", "Server error: ${it.code}")
+                    onFailure("Server error: ${it.code}")
+                    return
+                }
+                val responseBody = it.body?.string()
+                Log.d("FinalCalculation", "Response: $responseBody")
+
+                try {
+                    val jsonResponse = JSONObject(responseBody ?: "{}")
+                    val success = jsonResponse.optBoolean("success", false)
+                    val message = jsonResponse.optString("message", "Unknown response")
+
+                    Handler(Looper.getMainLooper()).post {
+                        if (success) {
+                            Log.d("FinalCalculation", "Success: $message")
+
+                            // Clear only Outward data before navigating back
+                            sharedViewModel.clearOutwardData()
+
+                            // Navigate to OutwardScreen only
+                            navController.navigate("outwardScreen/$username/$depot") {
+                                popUpTo("outwardScreen/$username/$depot") { inclusive = true }
+                            }
+                        } else {
+                            onFailure(message)
+                        }
+                    }
+                } catch (e: JSONException) {
+                    Log.e("FinalCalculation", "JSON parsing error: ${e.message}")
+                    Handler(Looper.getMainLooper()).post {
+                        onFailure("Invalid server response")
+                    }
+                }
+            }
+        }
+    })
+}
+
+// Calculate Total Amount
 fun calculateTotalAmount(
     totalQty: Int, totalWeight: Double, rate: Double = 0.0
 ): Int {
