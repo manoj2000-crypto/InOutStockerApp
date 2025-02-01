@@ -3,6 +3,7 @@ package com.example.inoutstocker
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -58,6 +62,11 @@ fun FinalCalculationForOutwardScreen(
     var finalAmount by remember { mutableIntStateOf(totalAmount) }
     var hamaliVendorName by remember { mutableStateOf("") }
     var hamaliType by remember { mutableStateOf("") }
+
+    // State for showing the modal dialog
+    var showDialog by remember { mutableStateOf(false) }
+    var drsThcMapping by remember { mutableStateOf("") }
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
     // Fetch total weight and quantity from scanned data
     LaunchedEffect(outwardScannedData) {
@@ -177,6 +186,10 @@ fun FinalCalculationForOutwardScreen(
                                 sharedViewModel = sharedViewModel,
                                 onFailure = { error ->
                                     Log.e("FinalCalculation", "Error: $error")
+                                },
+                                onSuccess = { drsThcNumber ->
+                                    drsThcMapping = drsThcNumber
+                                    showDialog = true
                                 })
                         }, modifier = Modifier.fillMaxWidth()
                     ) {
@@ -186,6 +199,40 @@ fun FinalCalculationForOutwardScreen(
             }
         }
     }
+
+    // Show the modal dialog
+    if (showDialog) {
+        AlertDialog(onDismissRequest = {
+            showDialog = false
+            navController.navigate("outwardScreen/$username/$depot") {
+                popUpTo("outwardScreen/$username/$depot") { inclusive = true }
+            }
+        },
+            title = { Text("Generated Number") },
+            text = { Text("DRS/THC Number: $drsThcMapping") },
+            confirmButton = {
+                Button(onClick = {
+                    showDialog = false
+                    navController.navigate("outwardScreen/$username/$depot") {
+                        popUpTo("outwardScreen/$username/$depot") { inclusive = true }
+                    }
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    clipboardManager.setText(AnnotatedString(drsThcMapping))
+                    showDialog = false
+                    navController.navigate("outwardScreen/$username/$depot") {
+                        popUpTo("outwardScreen/$username/$depot") { inclusive = true }
+                    }
+                }) {
+                    Text("Copy")
+                }
+            })
+    }
+
 }
 
 fun submitFinalCalculation(
@@ -203,11 +250,11 @@ fun submitFinalCalculation(
     outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>>,
     navController: NavController,
     sharedViewModel: SharedViewModel,
-    onFailure: (String) -> Unit
+    onFailure: (String) -> Unit,
+    onSuccess: (String) -> Unit
 ) {
     val client = OkHttpClient()
-    val url =
-        "https://vtc3pl.com/final_outward_calculation.php"
+    val url = "https://vtc3pl.com/final_outward_calculation.php"
 
     val jsonRequest = JSONObject().apply {
         put("username", username)
@@ -265,13 +312,23 @@ fun submitFinalCalculation(
                         if (success) {
                             Log.d("FinalCalculation", "Success: $message")
 
-                            // Clear only Outward data before navigating back
-                            sharedViewModel.clearOutwardData()
-
-                            // Navigate to OutwardScreen only
-                            navController.navigate("outwardScreen/$username/$depot") {
-                                popUpTo("outwardScreen/$username/$depot") { inclusive = true }
+                            // Extract drsThcMapping from response
+                            val drsThcMappingJson = jsonResponse.optJSONObject("drsThcMapping")
+                            var generatedNumber = "N/A"
+                            if (drsThcMappingJson != null) {
+                                val keys = drsThcMappingJson.keys()
+                                val numbers = mutableListOf<String>()
+                                while (keys.hasNext()) {
+                                    val key = keys.next()
+                                    numbers.add(drsThcMappingJson.optString(key, ""))
+                                }
+                                if (numbers.isNotEmpty()) {
+                                    // Join multiple THC numbers with a comma, or choose as needed
+                                    generatedNumber = numbers.joinToString(", ")
+                                }
                             }
+                            onSuccess(generatedNumber)
+                            sharedViewModel.clearOutwardData()
                         } else {
                             onFailure(message)
                         }
