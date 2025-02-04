@@ -11,7 +11,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +39,6 @@ fun PreviewInwardScreen(
     onBack: () -> Unit,
     navigateToFinalCalculation: (String, String, String, String, List<Pair<String, Pair<Int, List<Int>>>>) -> Unit
 ) {
-
     // Log scannedItems for debugging
     Log.d("PreviewInwardScreen", "Scanned Items: $scannedItems")
 
@@ -46,6 +47,7 @@ fun PreviewInwardScreen(
     activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
     val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
     val prnData = remember { mutableStateListOf<Pair<String, List<String>>>() }
     val thcData = remember { mutableStateListOf<Pair<String, List<String>>>() }
     val excessLrData = remember { mutableStateListOf<String>() }
@@ -56,12 +58,19 @@ fun PreviewInwardScreen(
 
     val sharedViewModel: SharedViewModel = viewModel()
 
+    // New state for MissingLR modal:
+    var showMissingModal by remember { mutableStateOf(false) }
+    var missingModalTitle by remember { mutableStateOf("") }
+    var missingModalContent by remember { mutableStateOf<List<String>>(emptyList()) }
+
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
             val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems)
             prnData.addAll(prnResults)
             thcData.addAll(thcResults)
             excessLrData.addAll(excessLrs)
+
+            isLoading = false
         }
     }
 
@@ -80,54 +89,94 @@ fun PreviewInwardScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            SectionTitle(title = "PRN:")
-            ItemList(items = prnData, processedNumbers = processedNumbers, onArrivalClick = { prn ->
 
-                // Filter scannedItems based on LRNOs associated with the selected PRN
-                val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
-                val filteredScannedItems = scannedItems.filter { it.first in lrnosForPrn }
+            if (isLoading) {
+                // Show Lottie loading animation while fetching data
+                Box(
+                    modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
+                ) {
+                    LottieAnimationView()
+                }
+            } else {
 
-                navigateToFinalCalculation(
-                    "PRN",
-                    URLEncoder.encode(prn, StandardCharsets.UTF_8.toString()),
-                    username,
-                    depot,
-                    filteredScannedItems
-                )
-                processedNumbers.add(prn)
-            }, onShowClick = { lrnos ->
-                modalContent = lrnos
-                showModal = true
-            })
+                SectionTitle(title = "PRN:")
+                ItemList(items = prnData,
+                    processedNumbers = processedNumbers,
+                    scannedItems = scannedItems,
+                    onArrivalClick = { prn ->
 
-            SectionTitle(title = "THC:")
-            ItemList(items = thcData, processedNumbers = processedNumbers, onArrivalClick = { thc ->
+                        // Filter scannedItems based on LRNOs associated with the selected PRN
+                        val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
+                        val filteredScannedItems = scannedItems.filter { it.first in lrnosForPrn }
 
-                // Filter scannedItems based on LRNOs associated with the selected THC
-                val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
-                val filteredScannedItems = scannedItems.filter { it.first in lrnosForThc }
+                        navigateToFinalCalculation(
+                            "PRN",
+                            URLEncoder.encode(prn, StandardCharsets.UTF_8.toString()),
+                            username,
+                            depot,
+                            filteredScannedItems
+                        )
+                        processedNumbers.add(prn)
+                    },
+                    onShowClick = { lrnos ->
+                        modalContent = lrnos
+                        showModal = true
+                    },
+                    onMissingLRClick = { lrnos ->
+                        missingModalContent = lrnos
+                        missingModalTitle = "Missing LR for PRN"
+                        showMissingModal = true
+                    })
 
-                navigateToFinalCalculation(
-                    "THC",
-                    URLEncoder.encode(thc, StandardCharsets.UTF_8.toString()),
-                    username,
-                    depot,
-                    filteredScannedItems
-                )
-                processedNumbers.add(thc)
-            }, onShowClick = { lrnos ->
-                modalContent = lrnos
-                showModal = true
-            })
+                SectionTitle(title = "THC:")
+                ItemList(items = thcData,
+                    processedNumbers = processedNumbers,
+                    scannedItems = scannedItems,
+                    onArrivalClick = { thc ->
 
-            SectionTitle(title = "Excess LR:")
-            ExcessLRList(excessLrData)
+                        // Filter scannedItems based on LRNOs associated with the selected THC
+                        val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
+                        val filteredScannedItems = scannedItems.filter { it.first in lrnosForThc }
 
-            if (showModal) {
-                LRModal(lrnos = modalContent, onDismiss = { showModal = false })
+                        navigateToFinalCalculation(
+                            "THC",
+                            URLEncoder.encode(thc, StandardCharsets.UTF_8.toString()),
+                            username,
+                            depot,
+                            filteredScannedItems
+                        )
+                        processedNumbers.add(thc)
+                    },
+                    onShowClick = { lrnos ->
+                        modalContent = lrnos
+                        showModal = true
+                    },
+                    onMissingLRClick = { lrnos ->
+                        missingModalContent = lrnos
+                        missingModalTitle = "Missing LR for THC"
+                        showMissingModal = true
+                    })
+
+                SectionTitle(title = "Excess LR:")
+                ExcessLRList(excessLrData)
+
+                if (showModal) {
+                    LRModal(lrnos = modalContent,
+                        scannedItems = scannedItems,
+                        onDismiss = { showModal = false })
+                }
+
+                if (showMissingModal) {
+                    MissingLRModal(title = missingModalTitle,
+                        lrnos = missingModalContent,
+                        scannedItems = scannedItems,
+                        onDismiss = { showMissingModal = false })
+                }
+
             }
         }
     }
+
 }
 
 @Composable
@@ -142,9 +191,11 @@ fun SectionTitle(title: String) {
 @Composable
 fun ItemList(
     items: List<Pair<String, List<String>>>,
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
     processedNumbers: List<String>,
     onArrivalClick: (String) -> Unit,
-    onShowClick: (List<String>) -> Unit
+    onShowClick: (List<String>) -> Unit,
+    onMissingLRClick: (List<String>) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -153,6 +204,19 @@ fun ItemList(
     ) {
         items(items) { (number, lrnos) ->
             val isProcessed = processedNumbers.contains(number)
+
+            // Compute if any LR in this group is missing:
+            val hasMissing = lrnos.any { lrno ->
+                val scanned = scannedItems.find { it.first == lrno }
+                if (scanned != null) {
+                    val totalPkgs = scanned.second.first
+                    val scannedCount = scanned.second.second.size
+                    totalPkgs > scannedCount  // missing if scannedCount is less than required
+                } else {
+                    true // if no scanned record exists, assume it's missing
+                }
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -164,11 +228,19 @@ fun ItemList(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Button(onClick = { onArrivalClick(number) }, enabled = !isProcessed) {
-                            Text("Arrival")
+                        Button(
+                            onClick = { onMissingLRClick(lrnos) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (hasMissing) Color.Red else MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Miss")
                         }
                         Button(onClick = { onShowClick(lrnos) }) {
                             Text("Show")
+                        }
+                        Button(onClick = { onArrivalClick(number) }, enabled = !isProcessed) {
+                            Text("Arrival")
                         }
                     }
                 }
@@ -199,15 +271,120 @@ fun ExcessLRList(excessLrData: List<String>) {
 }
 
 @Composable
-fun LRModal(lrnos: List<String>, onDismiss: () -> Unit) {
+fun LRModal(
+    lrnos: List<String>,
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    onDismiss: () -> Unit
+) {
     AlertDialog(onDismissRequest = onDismiss, confirmButton = {
         Button(onClick = onDismiss) {
             Text("Close")
         }
     }, text = {
-        LazyColumn {
-            items(lrnos) { lrno ->
-                Text(text = lrno, modifier = Modifier.padding(4.dp))
+        Column {
+            // Table Headers
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "LRNO",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Qty",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            HorizontalDivider()
+
+            // Display LRNO and Qty
+            LazyColumn {
+                items(lrnos) { lrno ->
+                    val qty = scannedItems.find { it.first == lrno }?.second?.first ?: 0
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = lrno, modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = qty.toString(), modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    })
+}
+
+@Composable
+fun MissingLRModal(
+    title: String,
+    lrnos: List<String>,
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(onDismissRequest = onDismiss, confirmButton = {
+        Button(onClick = onDismiss) {
+            Text("Close")
+        }
+    }, title = { Text(title) }, text = {
+        Column {
+            // Table Headers
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "LRNO",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Missing Items",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            HorizontalDivider()
+            LazyColumn {
+                items(lrnos) { lrno ->
+                    // Find the scanned record for this LRNO.
+                    val scannedItem = scannedItems.find { it.first == lrno }
+
+                    // Compute missing list as comma separated string.
+                    val missingListText = if (scannedItem != null) {
+                        val totalPkgs = scannedItem.second.first
+                        val scannedBoxes = scannedItem.second.second
+                        // Generate the complete list of expected box numbers (assumes numbering starts at 1).
+                        val expectedBoxes = (1..totalPkgs).toList()
+                        // Determine which expected boxes are missing.
+                        val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
+                        if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(", ") else ""
+                    } else {
+                        "Not Scanned"
+                    }
+
+                    // Only show rows where something is missing (or not scanned).
+                    if (missingListText.isNotEmpty() && missingListText != "0") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) {
+                            Text(text = lrno, modifier = Modifier.weight(1f))
+                            Text(text = missingListText, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     })
