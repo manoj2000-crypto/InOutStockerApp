@@ -94,7 +94,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                         parsedData?.let { (lrno, pkgsNo, boxNo) ->
                             sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
                             scannedData.value = data
-                            Log.d("AuditScreen", "Scanned Data: $data")
+                            Log.d("CameraScanView", "Scanned Data: $data")
                         }
                     }
                 })
@@ -145,7 +145,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isComplete) Color.Green else Color.White
+                        containerColor = if (isComplete) Color.Green else Color.Red
                     ),
                     elevation = CardDefaults.cardElevation(4.dp)
                 ) {
