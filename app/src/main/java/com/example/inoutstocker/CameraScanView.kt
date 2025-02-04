@@ -87,7 +87,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                         // Play beep sound using SoundPool
                         soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
 
-                        delay(2000) // Pause scanner for 2 seconds
+                        delay(1500) // Pause scanner for 1.5 seconds
                         isLoading.value = false
 
                         val parsedData = parseScannedData(data)
@@ -161,21 +161,23 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f)) // Push buttons to the bottom
-        // Button - Visible only if there are scanned items
-        if (sharedViewModel.scannedItems.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = { onPreview() }, modifier = Modifier.weight(1f)
-                ) {
-                    Text("Preview")
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                // Button - Visible only if there are scanned items
+                if (sharedViewModel.scannedItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(
+                            onClick = { onPreview() }, modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Preview")
+                        }
+                    }
                 }
             }
         }
