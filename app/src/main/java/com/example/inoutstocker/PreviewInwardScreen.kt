@@ -28,6 +28,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import androidx.lifecycle.viewmodel.compose.viewModel
+import okhttp3.FormBody
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SourceLockedOrientationActivity")
@@ -62,6 +63,11 @@ fun PreviewInwardScreen(
     var showMissingModal by remember { mutableStateOf(false) }
     var missingModalTitle by remember { mutableStateOf("") }
     var missingModalContent by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // A state to track processed excess LR numbers so that we send each only once.
+    val processedExcessLrs = remember { mutableStateListOf<String>() }
+    // Declare an error state at the top level of your composable.
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
@@ -160,6 +166,64 @@ fun PreviewInwardScreen(
                 SectionTitle(title = "Excess LR:")
                 ExcessLRList(excessLrData)
 
+                // Automatically send each Excess LR data to the PHP backend.
+                LaunchedEffect(excessLrData) {
+                    excessLrData.forEach { lr ->
+                        if (!processedExcessLrs.contains(lr)) {
+                            // Find the scanned record for this LR.
+                            val scannedRecord = scannedItems.find { it.first == lr }
+                            if (scannedRecord != null) {
+                                val totalPkg = scannedRecord.second.first
+                                val scannedBoxes = scannedRecord.second.second
+                                val scannedCount = scannedBoxes.size
+                                val totalDiff = totalPkg - scannedCount
+
+                                // Create a comma-separated list of scanned boxes.
+                                val scannedItemsStr = scannedBoxes.joinToString(",")
+
+                                // Compute missing items (if any)
+                                val expectedBoxes = (1..totalPkg).toList()
+                                val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
+                                val missingItemsStr =
+                                    if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else ""
+
+                                // Determine the ExcessLrType.
+                                // (In your app, you might determine this dynamically.
+                                // Here, we assume "PRN" as an example.)
+                                val excessLrType = "PRN"
+                                val excessFeatureType = "INWARD" // since this is the inward screen
+
+                                // Call the helper function to send the data.
+                                sendExcessLRData(lr = lr,
+                                    scannedCount = scannedBoxes.size,
+                                    totalDiff = totalDiff,
+                                    missingItemsStr = missingItemsStr,
+                                    username = username,
+                                    depot = depot,
+                                    excessLrType = excessLrType,
+                                    excessFeatureType = excessFeatureType,
+                                    onError = { error ->
+                                        // Update error state on error
+                                        errorMessage = error
+                                    })
+                            }
+                            processedExcessLrs.add(lr)
+                        }
+                    }
+                }
+
+                // Then, display an AlertDialog when errorMessage is not null:
+                if (errorMessage != null) {
+                    AlertDialog(onDismissRequest = { errorMessage = null },
+                        title = { Text("Error") },
+                        text = { Text(errorMessage ?: "") },
+                        confirmButton = {
+                            Button(onClick = { errorMessage = null }) {
+                                Text("Close")
+                            }
+                        })
+                }
+
                 if (showModal) {
                     LRModal(lrnos = modalContent,
                         scannedItems = scannedItems,
@@ -176,8 +240,50 @@ fun PreviewInwardScreen(
             }
         }
     }
-
 }
+
+suspend fun sendExcessLRData(
+    lr: String,
+    scannedCount: Int,
+    totalDiff: Int,
+    missingItemsStr: String,
+    username: String,
+    depot: String,
+    excessLrType: String,
+    excessFeatureType: String,
+    onError: (String) -> Unit
+) {
+    val client = OkHttpClient()
+    val url = "https://vtc3pl.com/insert_excess_lr.php"
+
+    val formBody =
+        FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot).add("LRNO", lr)
+            .add("ScannedItems", scannedCount.toString()).add("TotalDiff", totalDiff.toString())
+            .add("MissingItems", missingItemsStr).add("ExcessLrType", excessLrType)
+            .add("ExcessFeatureType", excessFeatureType).build()
+
+    val request = Request.Builder().url(url).post(formBody).build()
+
+    withContext(Dispatchers.IO) {
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errorMsg =
+                        "Failed to send data for LR: $lr. Response code: ${response.code}"
+                    Log.e("sendExcessLRData", errorMsg)
+                    onError(errorMsg) // trigger error callback
+                } else {
+                    Log.d("sendExcessLRData", "Successfully sent data for LR: $lr")
+                }
+            }
+        } catch (e: Exception) {
+            val errorMsg = "Exception while sending data for LR: $lr, error: ${e.message}"
+            Log.e("sendExcessLRData", errorMsg)
+            onError(errorMsg) // trigger error callback
+        }
+    }
+}
+
 
 @Composable
 fun SectionTitle(title: String) {
