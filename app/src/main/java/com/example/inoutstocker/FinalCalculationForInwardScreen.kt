@@ -319,13 +319,17 @@ fun FinalCalculationForInwardScreen(
                                             totalAmount = totalAmount,
                                             deductionAmount = deductionAmount,
                                             finalAmount = finalAmount,
+                                            closingKm = if (prnOrThc == "THC") closingKm else "",
+                                            unloadingHamaliReceived = if (prnOrThc == "THC") unloadingHamaliReceived else "",
+                                            paymentMode = if (prnOrThc == "THC") paymentMode else "",
+                                            transactionId = if (prnOrThc == "THC") transactionId else "",
+                                            reason = reason,
                                             onSuccess = {
                                                 Log.d(
                                                     "SubmitButton", "Data submitted successfully."
                                                 )
                                                 isLoading.value = false
                                                 showSuccessDialog.value = true
-//                                                onBack() // Navigate back and remove the card in PreviewInwardScreen
                                             },
                                             onFailure = { error ->
                                                 Log.e(
@@ -605,6 +609,12 @@ fun submitDataToServer(
     totalAmount: Int,
     deductionAmount: String,
     finalAmount: Int,
+    // Additional fields for THC (if not applicable for PRN, pass an empty string)
+    closingKm: String,
+    unloadingHamaliReceived: String,
+    paymentMode: String,
+    transactionId: String,
+    reason: String,
     onSuccess: () -> Unit,
     onFailure: (String) -> Unit
 ) {
@@ -623,8 +633,13 @@ fun submitDataToServer(
         put("hamaliVendorName", hamaliVendorName)
         put("hamaliType", hamaliType)
         put("totalAmount", totalAmount)
-        put("deductionAmount", deductionAmount)
+        put("deductionAmount", deductionAmount.toDoubleOrNull() ?: 0)
         put("finalAmount", finalAmount)
+        put("closingKm", closingKm)
+        put("unloadingHamaliReceived", unloadingHamaliReceived)
+        put("paymentMode", paymentMode)
+        put("transactionId", transactionId)
+        put("reason", reason)
     }
 
     val body = jsonObject.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -634,7 +649,6 @@ fun submitDataToServer(
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
-            // Ensure the callback is executed on the main thread
             Handler(Looper.getMainLooper()).post {
                 Log.e("OkHttp", "Request failed: ${e.message}")
                 onFailure("Request failed: ${e.message}")
@@ -643,14 +657,12 @@ fun submitDataToServer(
 
         override fun onResponse(call: Call, response: Response) {
             if (response.isSuccessful) {
-                // Ensure the callback is executed on the main thread
                 Handler(Looper.getMainLooper()).post {
                     val responseBody = response.body?.string()
                     Log.d("OkHttp", "Response: $responseBody")
                     onSuccess()
                 }
             } else {
-                // Ensure the callback is executed on the main thread
                 Handler(Looper.getMainLooper()).post {
                     val errorMessage = response.message
                     Log.e("OkHttp", "Error: $errorMessage")
