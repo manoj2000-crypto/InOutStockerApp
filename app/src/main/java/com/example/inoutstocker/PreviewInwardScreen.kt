@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -83,6 +84,10 @@ fun PreviewInwardScreen(
     // Set feature type to INWARD to get the correct scanned data
     sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
 
+    // State to hold pending arrival action data
+    var showArrivalConfirmation by remember { mutableStateOf(false) }
+    var pendingArrivalData by remember { mutableStateOf<ArrivalData?>(null) }
+
     Scaffold(topBar = {
         TopAppBar(title = { Text("Preview Inward Screen") }, navigationIcon = {
             IconButton(onClick = onBack) {
@@ -109,20 +114,43 @@ fun PreviewInwardScreen(
                 ItemList(items = prnData,
                     processedNumbers = processedNumbers,
                     scannedItems = scannedItems,
-                    onArrivalClick = { prn ->
+                    onArrivalClick = { number, lrnos ->
+
+                        // Compute whether there is any missing LR for this number
+                        val hasMissing = lrnos.any { lr ->
+                            val scanned = scannedItems.find { it.first == lr }
+                            if (scanned != null) {
+                                val totalPkg = scanned.second.first
+                                val scannedCount = scanned.second.second.size
+                                totalPkg > scannedCount
+                            } else {
+                                true
+                            }
+                        }
 
                         // Filter scannedItems based on LRNOs associated with the selected PRN
-                        val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
-                        val filteredScannedItems = scannedItems.filter { it.first in lrnosForPrn }
+//                        val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
+                        val filteredScannedItems = scannedItems.filter { it.first in lrnos }
 
-                        navigateToFinalCalculation(
-                            "PRN",
-                            URLEncoder.encode(prn, StandardCharsets.UTF_8.toString()),
-                            username,
-                            depot,
-                            filteredScannedItems
-                        )
-                        processedNumbers.add(prn)
+                        if (hasMissing) {
+                            // Save pending data and show the confirmation dialog.
+                            pendingArrivalData = ArrivalData(
+                                type = "PRN",
+                                number = number,
+                                scannedItems = filteredScannedItems,
+                                lrnos = lrnos
+                            )
+                            showArrivalConfirmation = true
+                        } else {
+                            navigateToFinalCalculation(
+                                "PRN",
+                                URLEncoder.encode(number, StandardCharsets.UTF_8.toString()),
+                                username,
+                                depot,
+                                filteredScannedItems
+                            )
+                            processedNumbers.add(number)
+                        }
                     },
                     onShowClick = { lrnos ->
                         modalContent = lrnos
@@ -138,20 +166,39 @@ fun PreviewInwardScreen(
                 ItemList(items = thcData,
                     processedNumbers = processedNumbers,
                     scannedItems = scannedItems,
-                    onArrivalClick = { thc ->
+                    onArrivalClick = { number, lrnos ->
+                        val hasMissing = lrnos.any { lr ->
+                            val scanned = scannedItems.find { it.first == lr }
+                            if (scanned != null) {
+                                val totalPkg = scanned.second.first
+                                val scannedCount = scanned.second.second.size
+                                totalPkg > scannedCount
+                            } else {
+                                true
+                            }
+                        }
 
                         // Filter scannedItems based on LRNOs associated with the selected THC
-                        val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
-                        val filteredScannedItems = scannedItems.filter { it.first in lrnosForThc }
-
-                        navigateToFinalCalculation(
-                            "THC",
-                            URLEncoder.encode(thc, StandardCharsets.UTF_8.toString()),
-                            username,
-                            depot,
-                            filteredScannedItems
-                        )
-                        processedNumbers.add(thc)
+//                        val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
+                        val filteredScannedItems = scannedItems.filter { it.first in lrnos }
+                        if (hasMissing) {
+                            pendingArrivalData = ArrivalData(
+                                type = "THC",
+                                number = number,
+                                scannedItems = filteredScannedItems,
+                                lrnos = lrnos
+                            )
+                            showArrivalConfirmation = true
+                        } else {
+                            navigateToFinalCalculation(
+                                "THC",
+                                URLEncoder.encode(number, StandardCharsets.UTF_8.toString()),
+                                username,
+                                depot,
+                                filteredScannedItems
+                            )
+                            processedNumbers.add(number)
+                        }
                     },
                     onShowClick = { lrnos ->
                         modalContent = lrnos
@@ -238,9 +285,61 @@ fun PreviewInwardScreen(
                 }
 
             }
+
+            if (showArrivalConfirmation && pendingArrivalData != null) {
+                AlertDialog(onDismissRequest = {
+                    showArrivalConfirmation = false
+                    pendingArrivalData = null
+                }, title = { // Create a Row that contains the warning icon and the title text.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.warning_icon),
+                            contentDescription = "Warning",
+                            tint = Color.Red, // Set tint if needed; or use Color.Unspecified to use the icon's colors
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Confirmation")
+                    }
+                }, text = { Text("Do you want to continue?") }, confirmButton = {
+                    Button(onClick = {
+                        // If Yes, navigate using the pending arrival data
+                        pendingArrivalData?.let { data ->
+                            navigateToFinalCalculation(
+                                data.type, URLEncoder.encode(
+                                    data.number, StandardCharsets.UTF_8.toString()
+                                ), username, depot, data.scannedItems
+                            )
+                            processedNumbers.add(data.number)
+                        }
+                        showArrivalConfirmation = false
+                        pendingArrivalData = null
+                    }) {
+                        Text("Yes")
+                    }
+                }, dismissButton = {
+                    Button(onClick = {
+                        // If No, just dismiss the dialog.
+                        showArrivalConfirmation = false
+                        pendingArrivalData = null
+                    }) {
+                        Text("No")
+                    }
+                })
+            }
+
         }
     }
 }
+
+// Add this data class at the top of your file (or within PreviewInwardScreen, above its return statement)
+data class ArrivalData(
+    val type: String, // "PRN" or "THC"
+    val number: String,
+    val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    val lrnos: List<String>
+)
+
 
 suspend fun sendExcessLRData(
     lr: String,
@@ -284,7 +383,6 @@ suspend fun sendExcessLRData(
     }
 }
 
-
 @Composable
 fun SectionTitle(title: String) {
     Text(
@@ -299,7 +397,7 @@ fun ItemList(
     items: List<Pair<String, List<String>>>,
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
     processedNumbers: List<String>,
-    onArrivalClick: (String) -> Unit,
+    onArrivalClick: (number: String, lrnos: List<String>) -> Unit,
     onShowClick: (List<String>) -> Unit,
     onMissingLRClick: (List<String>) -> Unit
 ) {
@@ -310,7 +408,6 @@ fun ItemList(
     ) {
         items(items) { (number, lrnos) ->
             val isProcessed = processedNumbers.contains(number)
-
             // Compute if any LR in this group is missing:
             val hasMissing = lrnos.any { lrno ->
                 val scanned = scannedItems.find { it.first == lrno }
@@ -345,7 +442,9 @@ fun ItemList(
                         Button(onClick = { onShowClick(lrnos) }) {
                             Text("Show")
                         }
-                        Button(onClick = { onArrivalClick(number) }, enabled = !isProcessed) {
+                        Button(
+                            onClick = { onArrivalClick(number, lrnos) }, enabled = !isProcessed
+                        ) {
                             Text("Arrival")
                         }
                     }
