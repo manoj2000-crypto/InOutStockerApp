@@ -215,6 +215,15 @@ fun PreviewInwardScreen(
 
                 // Automatically send each Excess LR data to the PHP backend.
                 LaunchedEffect(excessLrData) {
+
+                    // Compute the excessLrType once (based on prnData and thcData)
+                    val computedExcessLrType = when {
+                        prnData.isNotEmpty() && thcData.isNotEmpty() -> "PRN_THC"
+                        prnData.isNotEmpty() -> "PRN"
+                        thcData.isNotEmpty() -> "THC"
+                        else -> "NONE"
+                    }
+
                     excessLrData.forEach { lr ->
                         if (!processedExcessLrs.contains(lr)) {
                             // Find the scanned record for this LR.
@@ -234,10 +243,6 @@ fun PreviewInwardScreen(
                                 val missingItemsStr =
                                     if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else ""
 
-                                // Determine the ExcessLrType.
-                                // (In your app, you might determine this dynamically.
-                                // Here, we assume "PRN" as an example.)
-                                val excessLrType = "PRN"
                                 val excessFeatureType = "INWARD" // since this is the inward screen
 
                                 // Call the helper function to send the data.
@@ -247,7 +252,7 @@ fun PreviewInwardScreen(
                                     missingItemsStr = missingItemsStr,
                                     username = username,
                                     depot = depot,
-                                    excessLrType = excessLrType,
+                                    excessLrType = computedExcessLrType,
                                     excessFeatureType = excessFeatureType,
                                     onError = { error ->
                                         // Update error state on error
@@ -339,7 +344,6 @@ data class ArrivalData(
     val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
     val lrnos: List<String>
 )
-
 
 suspend fun sendExcessLRData(
     lr: String,
