@@ -185,16 +185,19 @@ fun PreviewInwardScreen(
 
                             if (hasMissingFromFetched) {
                                 // Build a new scannedItems list with missing LR(s) “completed”
+//                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
+//                                    val detail = lrDetails.find { it.lrno == lrno }
+//                                    if (detail != null) {
+//                                        Pair(
+//                                            lrno,
+//                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
+//                                        )
+//                                    } else {
+//                                        scannedItems.find { it.first == lrno }
+//                                    }
+//                                }
                                 val modifiedScannedItems = lrnos.mapNotNull { lrno ->
-                                    val detail = lrDetails.find { it.lrno == lrno }
-                                    if (detail != null) {
-                                        Pair(
-                                            lrno,
-                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
-                                        )
-                                    } else {
-                                        scannedItems.find { it.first == lrno }
-                                    }
+                                    scannedItems.find { it.first == lrno }
                                 }
                                 pendingArrivalData = ArrivalData(
                                     type = "PRN",
@@ -267,16 +270,19 @@ fun PreviewInwardScreen(
 
                             if (hasMissingFromFetched) {
                                 // Build a “complete” scanned record for missing LR(s)
+//                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
+//                                    val detail = lrDetails.find { it.lrno == lrno }
+//                                    if (detail != null) {
+//                                        Pair(
+//                                            lrno,
+//                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
+//                                        )
+//                                    } else {
+//                                        scannedItems.find { it.first == lrno }
+//                                    }
+//                                }
                                 val modifiedScannedItems = lrnos.mapNotNull { lrno ->
-                                    val detail = lrDetails.find { it.lrno == lrno }
-                                    if (detail != null) {
-                                        Pair(
-                                            lrno,
-                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
-                                        )
-                                    } else {
-                                        scannedItems.find { it.first == lrno }
-                                    }
+                                    scannedItems.find { it.first == lrno }
                                 }
                                 pendingArrivalData = ArrivalData(
                                     type = "THC",
