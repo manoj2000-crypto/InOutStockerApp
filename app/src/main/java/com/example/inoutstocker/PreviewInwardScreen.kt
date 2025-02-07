@@ -70,6 +70,9 @@ fun PreviewInwardScreen(
     // Declare an error state at the top level of your composable.
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // Map to store for each token (PRN/THC number) whether there are missing items.
+    val missingStatusMap = remember { mutableStateMapOf<String, Boolean>() }
+
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
             val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems)
@@ -78,6 +81,62 @@ fun PreviewInwardScreen(
             excessLrData.addAll(excessLrs)
 
             isLoading = false
+        }
+    }
+
+    // Update missing status for each PRN token
+    LaunchedEffect(prnData, scannedItems) {
+        prnData.forEach { (token, lrnos) ->
+            val lrDetails = fetchLRDetailsForToken(token = token, type = "PRN")
+            val hasMissingFromFetched = lrnos.any { lrno ->
+                val detail = lrDetails.find { it.lrno == lrno }
+                // If detail exists then compare expected versus scanned.
+                val scannedRecord = scannedItems.find { it.first == lrno }
+                if (detail != null) {
+                    if (scannedRecord != null) {
+                        val scannedBoxes = scannedRecord.second.second
+                        (1..detail.totalPkg).toList().any { it !in scannedBoxes }
+                    } else {
+                        true
+                    }
+                } else {
+                    // If we did not fetch details, fall back to scannedItems.
+                    if (scannedRecord != null) {
+                        val totalPkgs = scannedRecord.second.first
+                        scannedRecord.second.second.size < totalPkgs
+                    } else {
+                        true
+                    }
+                }
+            }
+            missingStatusMap[token] = hasMissingFromFetched
+        }
+    }
+
+    // Update missing status for each THC token
+    LaunchedEffect(thcData, scannedItems) {
+        thcData.forEach { (token, lrnos) ->
+            val lrDetails = fetchLRDetailsForToken(token = token, type = "THC")
+            val hasMissingFromFetched = lrnos.any { lrno ->
+                val detail = lrDetails.find { it.lrno == lrno }
+                val scannedRecord = scannedItems.find { it.first == lrno }
+                if (detail != null) {
+                    if (scannedRecord != null) {
+                        val scannedBoxes = scannedRecord.second.second
+                        (1..detail.totalPkg).toList().any { it !in scannedBoxes }
+                    } else {
+                        true
+                    }
+                } else {
+                    if (scannedRecord != null) {
+                        val totalPkgs = scannedRecord.second.first
+                        scannedRecord.second.second.size < totalPkgs
+                    } else {
+                        true
+                    }
+                }
+            }
+            missingStatusMap[token] = hasMissingFromFetched
         }
     }
 
@@ -113,101 +172,165 @@ fun PreviewInwardScreen(
                 SectionTitle(title = "PRN:")
                 ItemList(items = prnData,
                     processedNumbers = processedNumbers,
+                    missingStatusMap = missingStatusMap,
                     scannedItems = scannedItems,
-                    onArrivalClick = { number, lrnos ->
-
-                        // Compute whether there is any missing LR for this number
-                        val hasMissing = lrnos.any { lr ->
-                            val scanned = scannedItems.find { it.first == lr }
-                            if (scanned != null) {
-                                val totalPkg = scanned.second.first
-                                val scannedCount = scanned.second.second.size
-                                totalPkg > scannedCount
-                            } else {
-                                true
+                    onArrivalClick = { token, lrnos ->
+                        coroutineScope.launch {
+                            val lrDetails = fetchLRDetailsForToken(token = token, type = "PRN")
+                            val hasMissingFromFetched = lrnos.any { lrno ->
+                                val detail = lrDetails.find { it.lrno == lrno }
+                                val scannedRecord = scannedItems.find { it.first == lrno }
+                                if (detail != null) {
+                                    if (scannedRecord != null) {
+                                        val scannedBoxes = scannedRecord.second.second
+                                        (1..detail.totalPkg).toList().any { it !in scannedBoxes }
+                                    } else {
+                                        true
+                                    }
+                                } else {
+                                    true
+                                }
                             }
-                        }
+                            missingStatusMap[token] = hasMissingFromFetched
 
-                        // Filter scannedItems based on LRNOs associated with the selected PRN
-//                        val lrnosForPrn = prnData.find { it.first == prn }?.second ?: emptyList()
-                        val filteredScannedItems = scannedItems.filter { it.first in lrnos }
-
-                        if (hasMissing) {
-                            // Save pending data and show the confirmation dialog.
-                            pendingArrivalData = ArrivalData(
-                                type = "PRN",
-                                number = number,
-                                scannedItems = filteredScannedItems,
-                                lrnos = lrnos
-                            )
-                            showArrivalConfirmation = true
-                        } else {
-                            navigateToFinalCalculation(
-                                "PRN",
-                                URLEncoder.encode(number, StandardCharsets.UTF_8.toString()),
-                                username,
-                                depot,
-                                filteredScannedItems
-                            )
-                            processedNumbers.add(number)
+                            if (hasMissingFromFetched) {
+                                // Build a new scannedItems list with missing LR(s) “completed”
+                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
+                                    val detail = lrDetails.find { it.lrno == lrno }
+                                    if (detail != null) {
+                                        Pair(
+                                            lrno,
+                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
+                                        )
+                                    } else {
+                                        scannedItems.find { it.first == lrno }
+                                    }
+                                }
+                                pendingArrivalData = ArrivalData(
+                                    type = "PRN",
+                                    number = token,
+                                    scannedItems = modifiedScannedItems,
+                                    lrnos = lrnos
+                                )
+                                showArrivalConfirmation = true
+                            } else {
+                                navigateToFinalCalculation("PRN",
+                                    URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
+                                    username,
+                                    depot,
+                                    scannedItems.filter { it.first in lrnos })
+                                processedNumbers.add(token)
+                            }
                         }
                     },
                     onShowClick = { lrnos ->
                         modalContent = lrnos
                         showModal = true
                     },
-                    onMissingLRClick = { lrnos ->
-                        missingModalContent = lrnos
-                        missingModalTitle = "Missing LR for PRN"
-                        showMissingModal = true
+                    onMissingLRClick = { token, lrnos ->
+                        coroutineScope.launch {
+                            val lrDetails = fetchLRDetailsForToken(token = token, type = "PRN")
+                            val details: List<Pair<String, String>> = lrDetails.map { detail ->
+                                val scannedRecord = scannedItems.find { it.first == detail.lrno }
+                                val missing = if (scannedRecord != null) {
+                                    val scannedBoxes = scannedRecord.second.second
+                                    val expectedBoxes = (1..detail.totalPkg).toList()
+                                    val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
+                                    if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else "None"
+                                } else {
+                                    (1..detail.totalPkg).joinToString(",")
+                                }
+                                detail.lrno to missing
+                            }.filter { (_, missing) ->
+                                missing != "None"
+                            }
+                            missingModalContent =
+                                details.map { (lrno, missing) -> "$lrno: $missing" }
+                            missingModalTitle = "Missing LR for PRN"
+                            showMissingModal = true
+                        }
                     })
 
                 SectionTitle(title = "THC:")
                 ItemList(items = thcData,
                     processedNumbers = processedNumbers,
+                    missingStatusMap = missingStatusMap,
                     scannedItems = scannedItems,
-                    onArrivalClick = { number, lrnos ->
-                        val hasMissing = lrnos.any { lr ->
-                            val scanned = scannedItems.find { it.first == lr }
-                            if (scanned != null) {
-                                val totalPkg = scanned.second.first
-                                val scannedCount = scanned.second.second.size
-                                totalPkg > scannedCount
-                            } else {
-                                true
+                    onArrivalClick = { token, lrnos ->
+                        coroutineScope.launch {
+                            val lrDetails = fetchLRDetailsForToken(token = token, type = "THC")
+                            val hasMissingFromFetched = lrnos.any { lrno ->
+                                val detail = lrDetails.find { it.lrno == lrno }
+                                val scannedRecord = scannedItems.find { it.first == lrno }
+                                if (detail != null) {
+                                    if (scannedRecord != null) {
+                                        val scannedBoxes = scannedRecord.second.second
+                                        (1..detail.totalPkg).toList().any { it !in scannedBoxes }
+                                    } else {
+                                        true
+                                    }
+                                } else {
+                                    true
+                                }
                             }
-                        }
+                            missingStatusMap[token] = hasMissingFromFetched
 
-                        // Filter scannedItems based on LRNOs associated with the selected THC
-//                        val lrnosForThc = thcData.find { it.first == thc }?.second ?: emptyList()
-                        val filteredScannedItems = scannedItems.filter { it.first in lrnos }
-                        if (hasMissing) {
-                            pendingArrivalData = ArrivalData(
-                                type = "THC",
-                                number = number,
-                                scannedItems = filteredScannedItems,
-                                lrnos = lrnos
-                            )
-                            showArrivalConfirmation = true
-                        } else {
-                            navigateToFinalCalculation(
-                                "THC",
-                                URLEncoder.encode(number, StandardCharsets.UTF_8.toString()),
-                                username,
-                                depot,
-                                filteredScannedItems
-                            )
-                            processedNumbers.add(number)
+                            if (hasMissingFromFetched) {
+                                // Build a “complete” scanned record for missing LR(s)
+                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
+                                    val detail = lrDetails.find { it.lrno == lrno }
+                                    if (detail != null) {
+                                        Pair(
+                                            lrno,
+                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
+                                        )
+                                    } else {
+                                        scannedItems.find { it.first == lrno }
+                                    }
+                                }
+                                pendingArrivalData = ArrivalData(
+                                    type = "THC",
+                                    number = token,
+                                    scannedItems = modifiedScannedItems,
+                                    lrnos = lrnos
+                                )
+                                showArrivalConfirmation = true
+                            } else {
+                                navigateToFinalCalculation("THC",
+                                    URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
+                                    username,
+                                    depot,
+                                    scannedItems.filter { it.first in lrnos })
+                                processedNumbers.add(token)
+                            }
                         }
                     },
                     onShowClick = { lrnos ->
                         modalContent = lrnos
                         showModal = true
                     },
-                    onMissingLRClick = { lrnos ->
-                        missingModalContent = lrnos
-                        missingModalTitle = "Missing LR for THC"
-                        showMissingModal = true
+                    onMissingLRClick = { token, lrnos ->
+                        coroutineScope.launch {
+                            val lrDetails = fetchLRDetailsForToken(token = token, type = "THC")
+                            val details: List<Pair<String, String>> = lrDetails.map { detail ->
+                                val scannedRecord = scannedItems.find { it.first == detail.lrno }
+                                val missing = if (scannedRecord != null) {
+                                    val scannedBoxes = scannedRecord.second.second
+                                    val expectedBoxes = (1..detail.totalPkg).toList()
+                                    val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
+                                    if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else "None"
+                                } else {
+                                    (1..detail.totalPkg).joinToString(",")
+                                }
+                                detail.lrno to missing
+                            }.filter { (_, missing) ->
+                                missing != "None"
+                            }
+                            missingModalContent =
+                                details.map { (lrno, missing) -> "$lrno: $missing" }
+                            missingModalTitle = "Missing LR for THC"
+                            showMissingModal = true
+                        }
                     })
 
                 SectionTitle(title = "Excess LR:")
@@ -226,26 +349,18 @@ fun PreviewInwardScreen(
 
                     excessLrData.forEach { lr ->
                         if (!processedExcessLrs.contains(lr)) {
-                            // Find the scanned record for this LR.
                             val scannedRecord = scannedItems.find { it.first == lr }
                             if (scannedRecord != null) {
                                 val totalPkg = scannedRecord.second.first
                                 val scannedBoxes = scannedRecord.second.second
                                 val scannedCount = scannedBoxes.size
                                 val totalDiff = totalPkg - scannedCount
-
-                                // Create a comma-separated list of scanned boxes.
-                                val scannedItemsStr = scannedBoxes.joinToString(",")
-
-                                // Compute missing items (if any)
                                 val expectedBoxes = (1..totalPkg).toList()
                                 val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
                                 val missingItemsStr =
                                     if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else ""
-
                                 val excessFeatureType = "INWARD" // since this is the inward screen
 
-                                // Call the helper function to send the data.
                                 sendExcessLRData(lr = lr,
                                     scannedCount = scannedBoxes.size,
                                     totalDiff = totalDiff,
@@ -255,7 +370,6 @@ fun PreviewInwardScreen(
                                     excessLrType = computedExcessLrType,
                                     excessFeatureType = excessFeatureType,
                                     onError = { error ->
-                                        // Update error state on error
                                         errorMessage = error
                                     })
                             }
@@ -284,8 +398,7 @@ fun PreviewInwardScreen(
 
                 if (showMissingModal) {
                     MissingLRModal(title = missingModalTitle,
-                        lrnos = missingModalContent,
-                        scannedItems = scannedItems,
+                        missingDetails = missingModalContent,
                         onDismiss = { showMissingModal = false })
                 }
 
@@ -295,12 +408,12 @@ fun PreviewInwardScreen(
                 AlertDialog(onDismissRequest = {
                     showArrivalConfirmation = false
                     pendingArrivalData = null
-                }, title = { // Create a Row that contains the warning icon and the title text.
+                }, title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             painter = painterResource(id = R.drawable.warning_icon),
                             contentDescription = "Warning",
-                            tint = Color.Red, // Set tint if needed; or use Color.Unspecified to use the icon's colors
+                            tint = Color.Red,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -308,7 +421,6 @@ fun PreviewInwardScreen(
                     }
                 }, text = { Text("Do you want to continue?") }, confirmButton = {
                     Button(onClick = {
-                        // If Yes, navigate using the pending arrival data
                         pendingArrivalData?.let { data ->
                             navigateToFinalCalculation(
                                 data.type, URLEncoder.encode(
@@ -324,7 +436,6 @@ fun PreviewInwardScreen(
                     }
                 }, dismissButton = {
                     Button(onClick = {
-                        // If No, just dismiss the dialog.
                         showArrivalConfirmation = false
                         pendingArrivalData = null
                     }) {
@@ -335,268 +446,6 @@ fun PreviewInwardScreen(
 
         }
     }
-}
-
-// Add this data class at the top of your file (or within PreviewInwardScreen, above its return statement)
-data class ArrivalData(
-    val type: String, // "PRN" or "THC"
-    val number: String,
-    val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
-    val lrnos: List<String>
-)
-
-suspend fun sendExcessLRData(
-    lr: String,
-    scannedCount: Int,
-    totalDiff: Int,
-    missingItemsStr: String,
-    username: String,
-    depot: String,
-    excessLrType: String,
-    excessFeatureType: String,
-    onError: (String) -> Unit
-) {
-    val client = OkHttpClient()
-    val url = "https://vtc3pl.com/insert_excess_lr.php"
-
-    val formBody =
-        FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot).add("LRNO", lr)
-            .add("ScannedItems", scannedCount.toString()).add("TotalDiff", totalDiff.toString())
-            .add("MissingItems", missingItemsStr).add("ExcessLrType", excessLrType)
-            .add("ExcessFeatureType", excessFeatureType).build()
-
-    val request = Request.Builder().url(url).post(formBody).build()
-
-    withContext(Dispatchers.IO) {
-        try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    val errorMsg =
-                        "Failed to send data for LR: $lr. Response code: ${response.code}"
-                    Log.e("sendExcessLRData", errorMsg)
-                    onError(errorMsg) // trigger error callback
-                } else {
-                    Log.d("sendExcessLRData", "Successfully sent data for LR: $lr")
-                }
-            }
-        } catch (e: Exception) {
-            val errorMsg = "Exception while sending data for LR: $lr, error: ${e.message}"
-            Log.e("sendExcessLRData", errorMsg)
-            onError(errorMsg) // trigger error callback
-        }
-    }
-}
-
-@Composable
-fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(8.dp)
-    )
-}
-
-@Composable
-fun ItemList(
-    items: List<Pair<String, List<String>>>,
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
-    processedNumbers: List<String>,
-    onArrivalClick: (number: String, lrnos: List<String>) -> Unit,
-    onShowClick: (List<String>) -> Unit,
-    onMissingLRClick: (List<String>) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-    ) {
-        items(items) { (number, lrnos) ->
-            val isProcessed = processedNumbers.contains(number)
-            // Compute if any LR in this group is missing:
-            val hasMissing = lrnos.any { lrno ->
-                val scanned = scannedItems.find { it.first == lrno }
-                if (scanned != null) {
-                    val totalPkgs = scanned.second.first
-                    val scannedCount = scanned.second.second.size
-                    totalPkgs > scannedCount  // missing if scannedCount is less than required
-                } else {
-                    true // if no scanned record exists, assume it's missing
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(4.dp)
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text("Number: $number")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Button(
-                            onClick = { onMissingLRClick(lrnos) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (hasMissing) Color.Red else MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Text("Miss")
-                        }
-                        Button(onClick = { onShowClick(lrnos) }) {
-                            Text("Show")
-                        }
-                        Button(
-                            onClick = { onArrivalClick(number, lrnos) }, enabled = !isProcessed
-                        ) {
-                            Text("Arrival")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ExcessLRList(excessLrData: List<String>) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-    ) {
-        items(excessLrData) { lr ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(4.dp)
-            ) {
-                Text(
-                    text = "Excess LR: $lr", modifier = Modifier.padding(8.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun LRModal(
-    lrnos: List<String>,
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(onDismissRequest = onDismiss, confirmButton = {
-        Button(onClick = onDismiss) {
-            Text("Close")
-        }
-    }, text = {
-        Column {
-            // Table Headers
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = "LRNO",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Qty",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-
-            HorizontalDivider()
-
-            // Display LRNO and Qty
-            LazyColumn {
-                items(lrnos) { lrno ->
-                    val qty = scannedItems.find { it.first == lrno }?.second?.first ?: 0
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = lrno, modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = qty.toString(), modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-    })
-}
-
-@Composable
-fun MissingLRModal(
-    title: String,
-    lrnos: List<String>,
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(onDismissRequest = onDismiss, confirmButton = {
-        Button(onClick = onDismiss) {
-            Text("Close")
-        }
-    }, title = { Text(title) }, text = {
-        Column {
-            // Table Headers
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = "LRNO",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Missing Items",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-            HorizontalDivider()
-            LazyColumn {
-                items(lrnos) { lrno ->
-                    // Find the scanned record for this LRNO.
-                    val scannedItem = scannedItems.find { it.first == lrno }
-
-                    // Compute missing list as comma separated string.
-                    val missingListText = if (scannedItem != null) {
-                        val totalPkgs = scannedItem.second.first
-                        val scannedBoxes = scannedItem.second.second
-                        // Generate the complete list of expected box numbers (assumes numbering starts at 1).
-                        val expectedBoxes = (1..totalPkgs).toList()
-                        // Determine which expected boxes are missing.
-                        val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
-                        if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(", ") else ""
-                    } else {
-                        "Not Scanned"
-                    }
-
-                    // Only show rows where something is missing (or not scanned).
-                    if (missingListText.isNotEmpty() && missingListText != "0") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        ) {
-                            Text(text = lrno, modifier = Modifier.weight(1f))
-                            Text(text = missingListText, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-    })
 }
 
 suspend fun fetchInwardData(
@@ -658,3 +507,282 @@ suspend fun fetchInwardData(
         }
     }
 }
+
+@Composable
+fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(8.dp)
+    )
+}
+
+@Composable
+fun ItemList(
+    items: List<Pair<String, List<String>>>,
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    processedNumbers: List<String>,
+    missingStatusMap: Map<String, Boolean>,
+    onArrivalClick: (number: String, lrnos: List<String>) -> Unit,
+    onShowClick: (List<String>) -> Unit,
+    onMissingLRClick: (token: String, lrnos: List<String>) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        items(items) { (number, lrnos) ->
+            val isProcessed = processedNumbers.contains(number)
+            val hasMissing = missingStatusMap[number] ?: lrnos.any { lrno ->
+                val scanned = scannedItems.find { it.first == lrno }
+                if (scanned != null) {
+                    val totalPkgs = scanned.second.first
+                    scanned.second.second.size < totalPkgs
+                } else {
+                    true
+                }
+            }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text("Number: $number")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(
+                            onClick = { onMissingLRClick(number, lrnos) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (hasMissing) Color.Red else MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Miss")
+                        }
+                        Button(onClick = { onShowClick(lrnos) }) {
+                            Text("Show")
+                        }
+                        Button(
+                            onClick = { onArrivalClick(number, lrnos) }, enabled = !isProcessed
+                        ) {
+                            Text("Arrival")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+suspend fun fetchLRDetailsForToken(token: String, type: String): List<LRDetails> {
+    val url = when (type) {
+        "PRN" -> "https://vtc3pl.com/fetch_lr_details_for_prn_inoutstockerapp.php"
+        "THC" -> "https://vtc3pl.com/fetch_lr_details_for_thc_inoutstockerapp.php"
+        else -> return emptyList()
+    }
+
+    val jsonBody = JSONObject().apply {
+        put("token", token)
+    }.toString().toRequestBody("application/json".toMediaTypeOrNull())
+
+    val request = Request.Builder().url(url).post(jsonBody).build()
+
+    val client = OkHttpClient()
+    return withContext(Dispatchers.IO) {
+        try {
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: "[]"
+                    val jsonArray = JSONArray(responseBody)
+                    (0 until jsonArray.length()).map { idx ->
+                        val obj = jsonArray.getJSONObject(idx)
+                        LRDetails(
+                            lrno = obj.getString("LRNO"), totalPkg = obj.getInt("PkgsNo")
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+}
+
+@Composable
+fun ExcessLRList(excessLrData: List<String>) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        items(excessLrData) { lr ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp)
+            ) {
+                Text(
+                    text = "Excess LR: $lr", modifier = Modifier.padding(8.dp)
+                )
+            }
+        }
+    }
+}
+
+suspend fun sendExcessLRData(
+    lr: String,
+    scannedCount: Int,
+    totalDiff: Int,
+    missingItemsStr: String,
+    username: String,
+    depot: String,
+    excessLrType: String,
+    excessFeatureType: String,
+    onError: (String) -> Unit
+) {
+    val client = OkHttpClient()
+    val url = "https://vtc3pl.com/insert_excess_lr.php"
+
+    val formBody =
+        FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot).add("LRNO", lr)
+            .add("ScannedItems", scannedCount.toString()).add("TotalDiff", totalDiff.toString())
+            .add("MissingItems", missingItemsStr).add("ExcessLrType", excessLrType)
+            .add("ExcessFeatureType", excessFeatureType).build()
+
+    val request = Request.Builder().url(url).post(formBody).build()
+
+    withContext(Dispatchers.IO) {
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errorMsg =
+                        "Failed to send data for LR: $lr. Response code: ${response.code}"
+                    Log.e("sendExcessLRData", errorMsg)
+                    onError(errorMsg)
+                } else {
+                    Log.d("sendExcessLRData", "Successfully sent data for LR: $lr")
+                }
+            }
+        } catch (e: Exception) {
+            val errorMsg = "Exception while sending data for LR: $lr, error: ${e.message}"
+            Log.e("sendExcessLRData", errorMsg)
+            onError(errorMsg)
+        }
+    }
+}
+
+@Composable
+fun LRModal(
+    lrnos: List<String>,
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(onDismissRequest = onDismiss, confirmButton = {
+        Button(onClick = onDismiss) {
+            Text("Close")
+        }
+    }, text = {
+        Column {
+            // Table Headers
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "LRNO",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Qty",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            HorizontalDivider()
+
+            // Display LRNO and Qty
+            LazyColumn {
+                items(lrnos) { lrno ->
+                    val qty = scannedItems.find { it.first == lrno }?.second?.first ?: 0
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = lrno, modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = qty.toString(), modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    })
+}
+
+@Composable
+fun MissingLRModal(
+    title: String, missingDetails: List<String>, onDismiss: () -> Unit
+) {
+    AlertDialog(onDismissRequest = onDismiss, confirmButton = {
+        Button(onClick = onDismiss) {
+            Text("Close")
+        }
+    }, title = { Text(title) }, text = {
+        Column {
+            if (missingDetails.isEmpty()) {
+                Text(
+                    text = "Nothing is missing! Everything is fine. You can proceed with arrival without worry.",
+                    color = Color.Green,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(8.dp)
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "LRNO and Missing Items",
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                HorizontalDivider()
+                LazyColumn {
+                    items(missingDetails) { detail ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) {
+                            Text(text = detail)
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
+data class ArrivalData(
+    val type: String, // "PRN" or "THC"
+    val number: String,
+    val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    val lrnos: List<String>
+)
+
+data class LRDetails(
+    val lrno: String, val totalPkg: Int
+)
