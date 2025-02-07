@@ -29,6 +29,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.gson.Gson
 import okhttp3.FormBody
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,7 +42,6 @@ fun PreviewInwardScreen(
     onBack: () -> Unit,
     navigateToFinalCalculation: (String, String, String, String, List<Pair<String, Pair<Int, List<Int>>>>) -> Unit
 ) {
-    // Log scannedItems for debugging
     Log.d("PreviewInwardScreen", "Scanned Items: $scannedItems")
 
     val context = LocalContext.current
@@ -60,17 +60,11 @@ fun PreviewInwardScreen(
 
     val sharedViewModel: SharedViewModel = viewModel()
 
-    // New state for MissingLR modal:
     var showMissingModal by remember { mutableStateOf(false) }
     var missingModalTitle by remember { mutableStateOf("") }
     var missingModalContent by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // A state to track processed excess LR numbers so that we send each only once.
-    val processedExcessLrs = remember { mutableStateListOf<String>() }
-    // Declare an error state at the top level of your composable.
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Map to store for each token (PRN/THC number) whether there are missing items.
     val missingStatusMap = remember { mutableStateMapOf<String, Boolean>() }
 
     LaunchedEffect(scannedItems) {
@@ -84,7 +78,6 @@ fun PreviewInwardScreen(
         }
     }
 
-    // Update missing status for each PRN token
     LaunchedEffect(prnData, scannedItems) {
         prnData.forEach { (token, lrnos) ->
             val lrDetails = fetchLRDetailsForToken(token = token, type = "PRN")
@@ -113,7 +106,6 @@ fun PreviewInwardScreen(
         }
     }
 
-    // Update missing status for each THC token
     LaunchedEffect(thcData, scannedItems) {
         thcData.forEach { (token, lrnos) ->
             val lrDetails = fetchLRDetailsForToken(token = token, type = "THC")
@@ -140,10 +132,8 @@ fun PreviewInwardScreen(
         }
     }
 
-    // Set feature type to INWARD to get the correct scanned data
     sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
 
-    // State to hold pending arrival action data
     var showArrivalConfirmation by remember { mutableStateOf(false) }
     var pendingArrivalData by remember { mutableStateOf<ArrivalData?>(null) }
 
@@ -336,10 +326,7 @@ fun PreviewInwardScreen(
                 SectionTitle(title = "Excess LR:")
                 ExcessLRList(excessLrData)
 
-                // Automatically send each Excess LR data to the PHP backend.
-                LaunchedEffect(excessLrData) {
-
-                    // Compute the excessLrType once (based on prnData and thcData)
+                LaunchedEffect(excessLrData, sharedViewModel.processedExcessLrs) {
                     val computedExcessLrType = when {
                         prnData.isNotEmpty() && thcData.isNotEmpty() -> "PRN_THC"
                         prnData.isNotEmpty() -> "PRN"
@@ -347,38 +334,46 @@ fun PreviewInwardScreen(
                         else -> "NONE"
                     }
 
-                    excessLrData.forEach { lr ->
-                        if (!processedExcessLrs.contains(lr)) {
-                            val scannedRecord = scannedItems.find { it.first == lr }
-                            if (scannedRecord != null) {
+                    val uniqueExcessLrs = excessLrData.distinct()
+                    Log.i("PreviewInwardScreen : ", "uniqueExcessLrs : $uniqueExcessLrs")
+
+                    // Filter out LRNOs that already exist in the processed list.
+                    val newExcessLRs = uniqueExcessLrs.filterNot { lr ->
+                        lr in sharedViewModel.processedExcessLrs
+                    }
+                    Log.d("ExcessLRInfo", "Filtered New Excess LR Numbers: $newExcessLRs")
+
+                    if (newExcessLRs.isNotEmpty()) {
+                        val excessLRInfoList = newExcessLRs.mapNotNull { lr ->
+                            scannedItems.find { it.first == lr }?.let { scannedRecord ->
                                 val totalPkg = scannedRecord.second.first
                                 val scannedBoxes = scannedRecord.second.second
                                 val scannedCount = scannedBoxes.size
                                 val totalDiff = totalPkg - scannedCount
                                 val expectedBoxes = (1..totalPkg).toList()
                                 val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
-                                val missingItemsStr =
-                                    if (missingBoxes.isNotEmpty()) missingBoxes.joinToString(",") else ""
-                                val excessFeatureType = "INWARD" // since this is the inward screen
-
-                                sendExcessLRData(lr = lr,
-                                    scannedCount = scannedBoxes.size,
-                                    totalDiff = totalDiff,
-                                    missingItemsStr = missingItemsStr,
-                                    username = username,
-                                    depot = depot,
-                                    excessLrType = computedExcessLrType,
-                                    excessFeatureType = excessFeatureType,
-                                    onError = { error ->
-                                        errorMessage = error
-                                    })
+                                val missingItemsStr = missingBoxes.joinToString(",").ifEmpty { "" }
+                                ExcessLRInfo(lr, scannedCount, totalDiff, missingItemsStr)
                             }
-                            processedExcessLrs.add(lr)
+                        }
+
+                        if (excessLRInfoList.isNotEmpty()) {
+                            sendExcessLRData(excessLRInfoList = excessLRInfoList,
+                                username = username,
+                                depot = depot,
+                                excessLrType = computedExcessLrType,
+                                excessFeatureType = "INWARD",
+                                onError = { error -> errorMessage = error },
+                                onSuccess = {
+                                    newExcessLRs.forEach { lr ->
+                                        sharedViewModel.addProcessedExcessLr(lr)
+                                        Log.i("LRNO inserted in sharedViewModel", "LRNO:  $lr")
+                                    }
+                                })
                         }
                     }
                 }
 
-                // Then, display an AlertDialog when errorMessage is not null:
                 if (errorMessage != null) {
                     AlertDialog(onDismissRequest = { errorMessage = null },
                         title = { Text("Error") },
@@ -635,24 +630,23 @@ fun ExcessLRList(excessLrData: List<String>) {
 }
 
 suspend fun sendExcessLRData(
-    lr: String,
-    scannedCount: Int,
-    totalDiff: Int,
-    missingItemsStr: String,
+    excessLRInfoList: List<ExcessLRInfo>,
     username: String,
     depot: String,
     excessLrType: String,
     excessFeatureType: String,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    onSuccess: () -> Unit
 ) {
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/insert_excess_lr.php"
 
-    val formBody =
-        FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot).add("LRNO", lr)
-            .add("ScannedItems", scannedCount.toString()).add("TotalDiff", totalDiff.toString())
-            .add("MissingItems", missingItemsStr).add("ExcessLrType", excessLrType)
-            .add("ExcessFeatureType", excessFeatureType).build()
+    val gson = Gson()
+    val jsonData = gson.toJson(excessLRInfoList)
+
+    val formBody = FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot)
+        .add("ExcessLrType", excessLrType).add("ExcessFeatureType", excessFeatureType)
+        .add("excessLRData", jsonData).build()
 
     val request = Request.Builder().url(url).post(formBody).build()
 
@@ -660,16 +654,16 @@ suspend fun sendExcessLRData(
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    val errorMsg =
-                        "Failed to send data for LR: $lr. Response code: ${response.code}"
+                    val errorMsg = "Failed to send batch data. Response code: ${response.code}"
                     Log.e("sendExcessLRData", errorMsg)
                     onError(errorMsg)
                 } else {
-                    Log.d("sendExcessLRData", "Successfully sent data for LR: $lr")
+                    Log.d("sendExcessLRData", "Successfully sent batch data")
+                    onSuccess()
                 }
             }
         } catch (e: Exception) {
-            val errorMsg = "Exception while sending data for LR: $lr, error: ${e.message}"
+            val errorMsg = "Exception while sending batch data: ${e.message}"
             Log.e("sendExcessLRData", errorMsg)
             onError(errorMsg)
         }

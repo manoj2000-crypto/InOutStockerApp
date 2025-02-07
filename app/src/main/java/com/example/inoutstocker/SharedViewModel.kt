@@ -85,6 +85,16 @@ class SharedViewModel : ViewModel() {
         tableData = data
     }
 
+    // Use a mutable state list so that Compose is aware when items change.
+    private val _processedExcessLrs = mutableStateListOf<String>()
+    val processedExcessLrs: List<String> get() = _processedExcessLrs
+
+    fun addProcessedExcessLr(lr: String) {
+        if (!_processedExcessLrs.contains(lr)) {
+            _processedExcessLrs.add(lr)
+        }
+    }
+
 }
 
 // Utility Functions for Default Dates
