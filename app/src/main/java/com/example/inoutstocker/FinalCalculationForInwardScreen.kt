@@ -467,21 +467,12 @@ fun HamaliVendorDropdown(
         val url = "https://vtc3pl.com/fetch_hamalivendor_only_prn_app.php"
 
         CoroutineScope(Dispatchers.IO).launch {
-            val startTime = System.currentTimeMillis() // Track the start time
+            val startTime = System.currentTimeMillis()
             try {
-                // Build the request body with the depot parameter
                 val requestBody = FormBody.Builder().add("spinnerDepo", depot).build()
-
-                // Create the request
                 val request = Request.Builder().url(url).post(requestBody).build()
-
-                // Initialize OkHttp client
                 val client = OkHttpClient()
-
-                // Execute the request
                 val response = client.newCall(request).execute()
-
-                // Parse the response
                 if (response.isSuccessful) {
                     val responseBody = response.body?.string()
                     val json = JSONArray(responseBody)
