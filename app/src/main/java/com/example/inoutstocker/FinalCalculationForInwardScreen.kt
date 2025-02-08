@@ -325,6 +325,8 @@ fun FinalCalculationForInwardScreen(
                                             transactionId = if (prnOrThc == "THC") transactionId else "",
                                             reason = reason,
                                             onSuccess = {
+                                                // Store the processedItems in the repository when the submission is successful
+                                                ProcessedItemsRepository.addProcessedItems(processedItems)
                                                 Log.d(
                                                     "SubmitButton", "Data submitted successfully."
                                                 )

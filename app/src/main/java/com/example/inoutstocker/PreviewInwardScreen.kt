@@ -67,6 +67,11 @@ fun PreviewInwardScreen(
 
     val missingStatusMap = remember { mutableStateMapOf<String, Boolean>() }
 
+    // Get the list of LR numbers that have been processed from our repository
+    val processedLRNos = ProcessedItemsRepository.getProcessedLRNos()
+    // Filter out the processed LR numbers from the excess list
+    val filteredExcessLrData = excessLrData.filterNot { it in processedLRNos }
+
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
             val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems, username, depot)
@@ -330,9 +335,9 @@ fun PreviewInwardScreen(
                     })
 
                 SectionTitle(title = "Excess LR:")
-                ExcessLRList(excessLrData)
+                ExcessLRList(excessLrData = filteredExcessLrData)
 
-                LaunchedEffect(excessLrData, sharedViewModel.processedExcessLrs) {
+                LaunchedEffect(filteredExcessLrData, sharedViewModel.processedExcessLrs) {
                     val computedExcessLrType = when {
                         prnData.isNotEmpty() && thcData.isNotEmpty() -> "PRN_THC"
                         prnData.isNotEmpty() -> "PRN"
@@ -340,7 +345,7 @@ fun PreviewInwardScreen(
                         else -> "NONE"
                     }
 
-                    val uniqueExcessLrs = excessLrData.distinct()
+                    val uniqueExcessLrs = filteredExcessLrData.distinct()
                     Log.i("PreviewInwardScreen : ", "uniqueExcessLrs : $uniqueExcessLrs")
 
                     // Filter out LRNOs that already exist in the processed list.
@@ -450,9 +455,7 @@ fun PreviewInwardScreen(
 }
 
 suspend fun fetchInwardData(
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
-    username: String,
-    depot: String
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, username: String, depot: String
 ): Triple<List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<String>> {
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
