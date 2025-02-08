@@ -69,7 +69,7 @@ fun PreviewInwardScreen(
 
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
-            val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems)
+            val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems, username, depot)
             prnData.addAll(prnResults)
             thcData.addAll(thcResults)
             excessLrData.addAll(excessLrs)
@@ -450,17 +450,28 @@ fun PreviewInwardScreen(
 }
 
 suspend fun fetchInwardData(
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
+    username: String,
+    depot: String
 ): Triple<List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<String>> {
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
 
-    val jsonArray = JSONArray()
-    scannedItems.forEach { (lrno, _) ->
-        jsonArray.put(lrno)
+//    val jsonArray = JSONArray()
+//    scannedItems.forEach { (lrno, _) ->
+//        jsonArray.put(lrno)
+//    }
+    val jsonObject = JSONObject().apply {
+        put("username", username)
+        put("depot", depot)
+        val lrnosArray = JSONArray()
+        scannedItems.forEach { (lrno, _) ->
+            lrnosArray.put(lrno)
+        }
+        put("lrnos", lrnosArray)
     }
 
-    val requestBody = jsonArray.toString().toRequestBody("application/json".toMediaTypeOrNull())
+    val requestBody = jsonObject.toString().toRequestBody("application/json".toMediaTypeOrNull())
     val request = Request.Builder().url(url).post(requestBody).build()
 
     return withContext(Dispatchers.IO) {
