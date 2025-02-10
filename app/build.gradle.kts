@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.androidx.camera.mlkit.vision)
 
     implementation(libs.gson)
+    implementation(libs.accompanist.placeholder.material)
 
 
     testImplementation(libs.junit)
