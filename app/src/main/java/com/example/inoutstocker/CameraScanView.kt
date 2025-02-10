@@ -47,7 +47,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
+fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, callerContext: String) {
     val scannedData = remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -88,23 +88,25 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
                         .align(Alignment.Center)
                 )
             } else {
-                BarcodeScanner(modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
-                    coroutineScope.launch {
-                        isLoading.value = true
-                        // Play beep sound using SoundPool
-                        soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
+                BarcodeScanner(
+                    modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
+                        coroutineScope.launch {
+                            isLoading.value = true
+                            // Play beep sound using SoundPool
+                            soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
 
-                        delay(1500) // Pause scanner for 1.5 seconds
-                        isLoading.value = false
+                            delay(1500) // Pause scanner for 1.5 seconds
+                            isLoading.value = false
 
-                        val parsedData = parseScannedData(data)
-                        parsedData?.let { (lrno, pkgsNo, boxNo) ->
-                            sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
-                            scannedData.value = data
-                            Log.d("CameraScanView", "Scanned Data: $data")
+                            val parsedData = parseScannedData(data)
+                            parsedData?.let { (lrno, pkgsNo, boxNo) ->
+                                sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
+                                scannedData.value = data
+                                Log.d("CameraScanView", "Scanned Data: $data")
+                            }
                         }
-                    }
-                })
+                    }, callerContext = callerContext, sharedViewModel = sharedViewModel
+                )
             }
         }
 

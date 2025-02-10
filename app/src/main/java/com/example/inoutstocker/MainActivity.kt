@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -87,15 +88,18 @@ fun PermissionHandler(content: @Composable () -> Unit) {
     // Remember permission states for Camera, Internet, and Bluetooth
     val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
     val internetPermissionState = rememberPermissionState(android.Manifest.permission.INTERNET)
-    val bluetoothPermissionState =
+    val bluetoothPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         rememberPermissionState(android.Manifest.permission.BLUETOOTH_CONNECT)
+    } else {
+        null  // For older versions, consider the permission as granted
+    }
 
     LaunchedEffect(Unit) {
         // Request permissions if not already granted
-        if (!cameraPermissionState.status.isGranted || !internetPermissionState.status.isGranted || !bluetoothPermissionState.status.isGranted) {
+        if (!cameraPermissionState.status.isGranted || !internetPermissionState.status.isGranted || (bluetoothPermissionState != null && !bluetoothPermissionState.status.isGranted)) {
             cameraPermissionState.launchPermissionRequest()
             internetPermissionState.launchPermissionRequest()
-            bluetoothPermissionState.launchPermissionRequest()
+            bluetoothPermissionState?.launchPermissionRequest()
         }
     }
 
@@ -132,7 +136,8 @@ fun PermissionHandler(content: @Composable () -> Unit) {
                 })
         }
 
-        !bluetoothPermissionState.status.isGranted -> {
+        // Only show the Bluetooth dialog if we're on Android 12+ and the permission isn’t granted
+        bluetoothPermissionState != null && !bluetoothPermissionState.status.isGranted -> {
             AlertDialog(onDismissRequest = {},
                 title = { Text("Bluetooth Permission Required") },
                 text = { Text("This app requires access to Bluetooth for scanning device. Please grant the permission.") },
@@ -219,7 +224,8 @@ fun LoginPage(navController: NavController) {
                         .padding(bottom = 32.dp)
                 )
 
-                OutlinedTextField(value = username,
+                OutlinedTextField(
+                    value = username,
                     onValueChange = { username = it },
                     label = { Text("Username") },
                     isError = username.isBlank(),
@@ -229,7 +235,8 @@ fun LoginPage(navController: NavController) {
                         .padding(bottom = 16.dp)
                 )
 
-                OutlinedTextField(value = password,
+                OutlinedTextField(
+                    value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     isError = password.isBlank(),

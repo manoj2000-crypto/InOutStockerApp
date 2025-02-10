@@ -302,7 +302,6 @@ fun LabelWithValue(label: String, value: String) {
     }
 }
 
-
 suspend fun fetchData(
     number: String, fromDate: String, toDate: String, username: String, depot: String
 ): Result<List<TableRowData>> {

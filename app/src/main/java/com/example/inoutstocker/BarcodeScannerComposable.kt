@@ -22,7 +22,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,7 +51,10 @@ import java.util.concurrent.Executors
 @OptIn(ExperimentalGetImage::class)
 @Composable
 fun BarcodeScanner(
-    modifier: Modifier = Modifier, onBarcodeScanned: (String) -> Unit
+    modifier: Modifier = Modifier,
+    onBarcodeScanned: (String) -> Unit,
+    callerContext: String,
+    sharedViewModel: SharedViewModel
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context as LifecycleOwner
@@ -77,6 +83,9 @@ fun BarcodeScanner(
             characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
         }
     }
+
+    // State for showing the delete confirmation dialog
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -232,6 +241,61 @@ fun BarcodeScanner(
                     },
                 colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
             )
+
+            Image(
+                painter = painterResource(
+                    id = R.drawable.delete_icon
+                ), contentDescription = "Delete Data", modifier = Modifier
+                    .size(24.dp)
+                    .clickable {
+                        showDeleteDialog = true
+                    }, colorFilter = ColorFilter.tint(Color.Red)
+            )
         }
+
+        // Show confirmation AlertDialog when requested
+        if (showDeleteDialog) {
+            AlertDialog(onDismissRequest = { showDeleteDialog = false }, title = {
+                // You can customize the title (for example, with an icon)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.warning_icon),
+                        contentDescription = "Warning",
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = ColorFilter.tint(Color.Red)
+                    )
+                    androidx.compose.foundation.layout.Spacer(
+                        modifier = Modifier.padding(
+                            horizontal = 8.dp
+                        )
+                    )
+                    Text("Confirmation")
+                }
+            }, text = {
+                Text("Are you sure? Do you really want to delete all scanned data?")
+            }, confirmButton = {
+                Button(onClick = {
+                    // Clear only the data for the current feature based on callerContext
+                    when (callerContext.uppercase()) {
+                        "INWARD" -> sharedViewModel.clearInwardScannedItems()
+                        "OUTWARD" -> sharedViewModel.clearOutwardScannedItems()
+                        "AUDIT" -> sharedViewModel.clearAuditScannedItems()
+                        else -> {
+                            // Fallback in case the callerContext is not recognized
+                            sharedViewModel.clearScannedItems()
+                        }
+                    }
+                    Log.i("DeleteButton", "Deleted scanned data from $callerContext")
+                    showDeleteDialog = false
+                }) {
+                    Text("Yes")
+                }
+            }, dismissButton = {
+                Button(onClick = { showDeleteDialog = false }) {
+                    Text("No")
+                }
+            })
+        }
+
     }
 }

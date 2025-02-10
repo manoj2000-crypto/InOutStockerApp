@@ -57,6 +57,20 @@ class SharedViewModel : ViewModel() {
         }
     }
 
+    // New methods for clearing only a specific feature's data
+    fun clearInwardScannedItems() {
+        inwardScannedItems.clear()
+        //CLEAR OTHER DATA HERE LIKE CLASSES , OBJECTS, ETC
+    }
+
+    fun clearOutwardScannedItems() {
+        outwardScannedItems.clear()
+    }
+
+    fun clearAuditScannedItems() {
+        auditScannedItems.clear()
+    }
+
     fun clearOutwardData() {
         outwardScannedItems.clear() // Clears only Outward Scanned Items
         _outwardScannedData.clear() // Clears only Outward-specific scanned data

@@ -74,7 +74,9 @@ fun InwardScreen(
                 when (scanMode) {
                     "camera" -> {
                         CameraScanView(
-                            sharedViewModel = sharedViewModel, onPreview = onPreview
+                            sharedViewModel = sharedViewModel,
+                            onPreview = onPreview,
+                            callerContext = "INWARD"
                         )
                     }
 
