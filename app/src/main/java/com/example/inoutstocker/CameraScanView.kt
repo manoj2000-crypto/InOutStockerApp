@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,13 +30,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.inoutstocker.utils.parseScannedData
+import com.google.accompanist.placeholder.PlaceholderHighlight
+import com.google.accompanist.placeholder.material.placeholder
+import com.google.accompanist.placeholder.material.shimmer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -103,80 +109,236 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit) {
         }
 
         // Spacer to create space between the barcode scanner and the table header
-        Spacer(modifier = Modifier.height(150.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Table Header - Visible only if there are scanned items
-        if (sharedViewModel.scannedItems.isNotEmpty()) {
-            // Table Header
+        // If there is no scanned data, show the skeleton (placeholder) UI.
+        if (sharedViewModel.scannedItems.isEmpty()) {
+            // --- Skeleton Table Header ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.primary)
-                    .padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    "LRNO", modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp), color = Color.White
+                // Each Box below acts as a placeholder for the header text.
+                Box(
+                    modifier = Modifier
+                        .weight(1.6f)
+                        .padding(8.dp)
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.shimmer(),
+                            color = Color.LightGray
+                        )
                 )
-                Text(
-                    "PkgNo", modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp), color = Color.White
+                Box(
+                    modifier = Modifier
+                        .weight(0.7f)
+                        .padding(8.dp)
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.shimmer(),
+                            color = Color.LightGray
+                        )
                 )
-                Text(
-                    "BoxNo", modifier = Modifier
+                Box(
+                    modifier = Modifier
                         .weight(1f)
-                        .padding(8.dp), color = Color.White
+                        .padding(8.dp)
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.shimmer(),
+                            color = Color.LightGray
+                        )
                 )
             }
-        }
 
-        // Tabular Data
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-        ) {
-            items(sharedViewModel.scannedItems) { (lrno, pair) ->
-                val (totalPkgs, boxes) = pair
-                val isComplete = boxes.size == totalPkgs
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isComplete) Color.Green else Color.Red
-                    ),
-                    elevation = CardDefaults.cardElevation(4.dp)
-                ) {
-                    Row(
+            // --- Skeleton Tabular Data & Preview Button ---
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+            ) {
+                // Show a fixed number of skeleton rows (e.g., 3)
+                items(1) {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.LightGray
+                        ),
+                        elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        Text(lrno, modifier = Modifier.weight(1f))
-                        Text("$totalPkgs", modifier = Modifier.weight(1f))
-                        Text(boxes.joinToString(", "), modifier = Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(2f)
+                                    .padding(8.dp)
+                                    .placeholder(
+                                        visible = true,
+                                        highlight = PlaceholderHighlight.shimmer(),
+                                        color = Color.Gray
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(0.7f)
+                                    .padding(8.dp)
+                                    .placeholder(
+                                        visible = true,
+                                        highlight = PlaceholderHighlight.shimmer(),
+                                        color = Color.Gray
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(8.dp)
+                                    .placeholder(
+                                        visible = true,
+                                        highlight = PlaceholderHighlight.shimmer(),
+                                        color = Color.Gray
+                                    )
+                            )
+                        }
                     }
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                // Button - Visible only if there are scanned items
-                if (sharedViewModel.scannedItems.isNotEmpty()) {
+                // Skeleton for the preview button
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Button(
-                            onClick = { onPreview() }, modifier = Modifier.weight(1f)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .placeholder(
+                                    visible = true,
+                                    highlight = PlaceholderHighlight.shimmer(),
+                                    color = Color.Gray
+                                )
+                        )
+                    }
+                }
+            }
+        } else {
+            // Table Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "LRNO",
+                    modifier = Modifier
+                        .weight(1.6f)
+                        .padding(8.dp),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "PkgNo",
+                    modifier = Modifier
+                        .weight(0.7f)
+                        .padding(8.dp),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "BoxNo",
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(8.dp),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Tabular Data
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+            ) {
+                items(sharedViewModel.scannedItems) { (lrno, pair) ->
+                    val (totalPkgs, boxes) = pair
+                    val isComplete = boxes.size == totalPkgs
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isComplete) Color.Green else Color.Red
+                        ),
+                        elevation = CardDefaults.cardElevation(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Preview")
+                            Text(
+                                lrno,
+                                modifier = Modifier
+                                    .weight(2f)
+                                    .padding(8.dp),
+                                textAlign = TextAlign.Start,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                "$totalPkgs",
+                                modifier = Modifier
+                                    .weight(0.7f)
+                                    .padding(8.dp),
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                boxes.joinToString(", "),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(8.dp),
+                                textAlign = TextAlign.Center,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Button - Visible only if there are scanned items
+                    if (sharedViewModel.scannedItems.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Button(
+                                onClick = { onPreview() }, modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Preview")
+                            }
                         }
                     }
                 }

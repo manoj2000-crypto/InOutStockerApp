@@ -16,12 +16,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -60,14 +57,11 @@ fun BarcodeScanner(
     var cameraControl: CameraControl? by remember { mutableStateOf(null) }
     var isFlashlightOn by remember { mutableStateOf(false) }
     var isCameraOn by remember { mutableStateOf(true) }
-//    val previewView = remember { androidx.camera.view.PreviewView(context) }
 
-    // Create a PreviewView and force it to use the parent's dimensions.
     val previewView = remember {
         androidx.camera.view.PreviewView(context).apply {
             implementationMode = androidx.camera.view.PreviewView.ImplementationMode.COMPATIBLE
             scaleType = androidx.camera.view.PreviewView.ScaleType.FILL_CENTER
-            // Force the view to match the parent's size.
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             )
@@ -84,7 +78,6 @@ fun BarcodeScanner(
         }
     }
 
-    // Clean up when the composable leaves composition.
     DisposableEffect(Unit) {
         onDispose {
             try {
@@ -104,14 +97,13 @@ fun BarcodeScanner(
         }
     }
 
-    // Bind (or unbind) the camera only when the isCameraOn flag changes.
     LaunchedEffect(isCameraOn) {
         val cameraProvider = cameraProviderFuture.get()
         if (isCameraOn) {
             try {
                 cameraProvider.unbindAll()
                 val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+                    it.surfaceProvider = previewView.surfaceProvider
                 }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -146,7 +138,6 @@ fun BarcodeScanner(
                     lifecycleOwner, cameraSelector, preview, imageAnalysis
                 )
                 cameraControl = camera.cameraControl
-                // Reapply torch state if it was on before binding.
                 if (isFlashlightOn) {
                     cameraControl?.enableTorch(true)
                 }
@@ -167,7 +158,7 @@ fun BarcodeScanner(
         modifier = modifier
             .fillMaxWidth()
             .requiredHeight(220.dp)
-            .clipToBounds() // Ensures any overflow is clipped.
+            .clipToBounds()
             .background(Color.Black)
 
     ) {
@@ -176,7 +167,6 @@ fun BarcodeScanner(
                 factory = { previewView }, modifier = Modifier.fillMaxSize()
             )
         } else {
-            // When camera is off, show a black screen.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -191,7 +181,6 @@ fun BarcodeScanner(
                 .zIndex(1f),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Flashlight Toggle
             Image(
                 painter = painterResource(
                     id = if (isFlashlightOn) R.drawable.flashlight_off_24px
@@ -202,11 +191,9 @@ fun BarcodeScanner(
                         val newState = !isFlashlightOn
                         try {
                             if (isCameraOn && cameraControl != null) {
-                                // Simply call enableTorch and update state.
                                 cameraControl?.enableTorch(newState)
                                 isFlashlightOn = newState
                             } else {
-                                // Fallback using Camera2 API when camera is off.
                                 if (backCameraId != null) {
                                     cameraManager.setTorchMode(backCameraId, newState)
                                     isFlashlightOn = newState
@@ -223,7 +210,6 @@ fun BarcodeScanner(
                     }, colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
             )
 
-            // Camera On/Off Toggle
             Image(
                 painter = painterResource(
                     id = if (isCameraOn) R.drawable.no_photography_24px
@@ -237,7 +223,6 @@ fun BarcodeScanner(
                             try {
                                 cameraProviderFuture.get().unbindAll()
                                 cameraControl = null
-                                // Also turn off the flashlight.
                                 isFlashlightOn = false
                             } catch (e: Exception) {
                                 Log.e("Camera", "Error turning off camera: ${e.message}", e)
@@ -248,6 +233,5 @@ fun BarcodeScanner(
                 colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
             )
         }
-
     }
 }
