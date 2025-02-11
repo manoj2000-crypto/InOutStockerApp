@@ -263,7 +263,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    "BoxNo",
+                    "ItemNo",
                     modifier = Modifier
                         .weight(1f)
                         .padding(8.dp),
