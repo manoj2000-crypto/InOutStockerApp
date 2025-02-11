@@ -48,6 +48,7 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -94,12 +95,12 @@ fun FinalCalculationForInwardScreen(
     }
 
     var hamaliVendorName by remember { mutableStateOf("") }
-    var hamaliType by remember { mutableStateOf("") }
+    var hamaliType by remember { mutableStateOf("REGULAR") }
     var totalAmount by remember { mutableIntStateOf(0) }
-    var deductionAmount by remember { mutableStateOf("") }
+    var deductionAmount by remember { mutableStateOf("0") }
 
     var finalAmount by remember { mutableIntStateOf(totalAmount) }
-    var freight by remember { mutableStateOf("") }
+    var freight by remember { mutableStateOf("0") }
     var godownKeeperName by remember { mutableStateOf("") }
     var closingKm by remember { mutableStateOf("") }
 
@@ -107,6 +108,10 @@ fun FinalCalculationForInwardScreen(
     var transactionId by remember { mutableStateOf("") }
     var unloadingHamaliReceived by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+
+    LaunchedEffect(username) {
+        godownKeeperName = fetchFullName(username)
+    }
 
     // Update Final Amount whenever Deduction Amount changes
     LaunchedEffect(deductionAmount) {
@@ -150,6 +155,10 @@ fun FinalCalculationForInwardScreen(
         finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
         Log.d("DeductionChange", "Deduction: $deductionAmount, Final Amount: $finalAmount")
     }
+
+    val isSubmitEnabled = reason.trim().isNotEmpty() && hamaliVendorName.trim()
+        .isNotEmpty() && godownKeeperName.trim()
+        .isNotEmpty() && hamaliVendorName != "No Hamali Vendor"
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("Final Calculation") })
@@ -236,7 +245,8 @@ fun FinalCalculationForInwardScreen(
                         value = godownKeeperName,
                         onValueChange = { godownKeeperName = it },
                         label = { Text("Godown Keeper Name") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = false
                     )
                 }
                 Log.d("FinalCalculationScreen", "Godown Keeper Name: $godownKeeperName")
@@ -326,7 +336,9 @@ fun FinalCalculationForInwardScreen(
                                             reason = reason,
                                             onSuccess = {
                                                 // Store the processedItems in the repository when the submission is successful
-                                                ProcessedItemsRepository.addProcessedItems(processedItems)
+                                                ProcessedItemsRepository.addProcessedItems(
+                                                    processedItems
+                                                )
                                                 Log.d(
                                                     "SubmitButton", "Data submitted successfully."
                                                 )
@@ -344,7 +356,7 @@ fun FinalCalculationForInwardScreen(
                                         isLoading.value = false
                                     }
                                 }
-                            }, modifier = Modifier.fillMaxWidth()
+                            }, modifier = Modifier.fillMaxWidth(), enabled = isSubmitEnabled
                         ) {
                             Text("Submit")
                         }
@@ -372,6 +384,41 @@ fun FinalCalculationForInwardScreen(
             }
         }
     })
+}
+
+suspend fun fetchFullName(username: String): String {
+    return withContext(Dispatchers.IO) {
+        try {
+            val client = OkHttpClient()
+            val mediaType = "application/x-www-form-urlencoded".toMediaTypeOrNull()
+            val requestBody = "user_name=$username".toRequestBody(mediaType)
+            val request =
+                Request.Builder().url("https://vtc3pl.com/fetch_fullname_user_inoutstockerapp.php")
+                    .post(requestBody).build()
+
+            val response: Response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (responseBody.isEmpty()) {
+                return@withContext "Error: Empty response"
+            }
+
+            return@withContext try {
+                val jsonResponse = JSONObject(responseBody)
+                if (jsonResponse.optString("status") == "success") {
+                    jsonResponse.optString("FullName", "Not Found")
+                } else {
+                    jsonResponse.optString("message", "Not Found")
+                }
+            } catch (e: Exception) {
+                Log.e("fetchFullName", "Error parsing JSON", e)
+                "Error: Invalid response"
+            }
+        } catch (e: Exception) {
+            Log.e("fetchFullName", "Error fetching full name", e)
+            "Error: Network issue"
+        }
+    }
 }
 
 fun fetchHamaliRates(
@@ -460,7 +507,7 @@ fun fetchWeightsFromServer(
 fun HamaliVendorDropdown(
     selectedOption: String, onOptionSelected: (String) -> Unit, depot: String
 ) {
-    var options by remember { mutableStateOf<List<String>>(listOf("No Hamali Vendor")) }
+    var options by remember { mutableStateOf(listOf("No Hamali Vendor")) }
     var isLoading by remember { mutableStateOf(false) }
 
     // Function to fetch vendors
