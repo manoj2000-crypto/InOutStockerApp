@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -93,6 +94,33 @@ fun FinalCalculationForInwardScreen(
             "LRNO: ${item.first}, PkgsNo: ${item.second.first}, BoxNos: ${item.second.second}"
         )
     }
+    //ADDED code here to see the all inward data and after that if it matches the arrival lr with the shared view modal then we have to remove that from the Shred view modal
+    val sharedViewModel: SharedViewModel = viewModel()
+    // Trigger logging when the composable is first composed
+    LaunchedEffect(Unit) {
+        // Set the feature type to INWARD
+        sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
+
+        // Log the dates
+        Log.d("InwardData", "From Date: ${sharedViewModel.fromDate}")
+        Log.d("InwardData", "To Date: ${sharedViewModel.toDate}")
+
+        // Log each scanned item
+        sharedViewModel.scannedItems.forEach { item ->
+            val (lrno, data) = item
+            val (totalPkgs, boxNos) = data
+            Log.d(
+                "InwardData",
+                "LRNO: $lrno, Total Packages: $totalPkgs, Box Numbers: ${boxNos.joinToString(", ")}"
+            )
+        }
+
+        // Log any processed excess LRs
+        sharedViewModel.processedExcessLrs.forEach { lr ->
+            Log.d("InwardData", "Processed Excess LR: $lr")
+        }
+    }
+
 
     var hamaliVendorName by remember { mutableStateOf("") }
     var hamaliType by remember { mutableStateOf("REGULAR") }
