@@ -108,6 +108,16 @@ class SharedViewModel : ViewModel() {
         }
     }
 
+    // Add this property at the top of your SharedViewModel class (with other mutableState properties)
+    var categorizedLrnos by mutableStateOf<Map<String, List<String>>>(emptyMap())
+        private set
+
+    // Add a setter method to update the mapping when available
+    fun updateCategorizedLrnos(newMap: Map<String, List<String>>) {
+        categorizedLrnos = newMap
+    }
+
+
 }
 
 // Utility Functions for Default Dates

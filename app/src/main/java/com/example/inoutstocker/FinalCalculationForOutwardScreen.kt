@@ -6,14 +6,18 @@ import android.util.Log
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
@@ -26,11 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import okhttp3.Call
 import okhttp3.Callback
@@ -58,14 +64,17 @@ fun FinalCalculationForOutwardScreen(
 ) {
     val outwardScannedData = sharedViewModel.outwardScannedData
     var totalAmount by remember { mutableIntStateOf(0) }
-    var deductionAmount by remember { mutableStateOf("") }
+    var deductionAmount by remember { mutableStateOf("0") }
     var finalAmount by remember { mutableIntStateOf(totalAmount) }
     var hamaliVendorName by remember { mutableStateOf("") }
-    var hamaliType by remember { mutableStateOf("") }
+    var hamaliType by remember { mutableStateOf("REGULAR") }
 
     // State for showing the modal dialog
     var showDialog by remember { mutableStateOf(false) }
     var drsThcMapping by remember { mutableStateOf("") }
+    var additionalMessage by remember { mutableStateOf("") }
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorModalMessage by remember { mutableStateOf("") }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
     // Fetch total weight and quantity from scanned data
@@ -182,13 +191,17 @@ fun FinalCalculationForOutwardScreen(
                                 hamaliVendorName = hamaliVendorName,
                                 hamaliType = hamaliType,
                                 outwardScannedData = outwardScannedData,
+                                categorizedLrnos = sharedViewModel.categorizedLrnos,
                                 navController = navController,
                                 sharedViewModel = sharedViewModel,
                                 onFailure = { error ->
                                     Log.e("FinalCalculation", "Error: $error")
+                                    errorModalMessage = error
+                                    showErrorDialog = true
                                 },
-                                onSuccess = { drsThcNumber ->
+                                onSuccess = { drsThcNumber, additionalMsg ->
                                     drsThcMapping = drsThcNumber
+                                    additionalMessage = additionalMsg
                                     showDialog = true
                                 })
                         }, modifier = Modifier.fillMaxWidth()
@@ -209,7 +222,7 @@ fun FinalCalculationForOutwardScreen(
             }
         },
             title = { Text("Generated Number") },
-            text = { Text("DRS/THC Number: $drsThcMapping") },
+            text = { Text("DRS/THC/MF Number: $drsThcMapping \n-------\nMessage: $additionalMessage") },
             confirmButton = {
                 Button(onClick = {
                     showDialog = false
@@ -233,6 +246,35 @@ fun FinalCalculationForOutwardScreen(
             })
     }
 
+    if (showErrorDialog) {
+        Dialog(onDismissRequest = { showErrorDialog = false }) {
+            Surface(
+                shape = MaterialTheme.shapes.medium, color = Color.Red
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Error", color = Color.White, style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        errorModalMessage,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Button(onClick = { showErrorDialog = false }) {
+                            Text("OK")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 fun submitFinalCalculation(
@@ -248,11 +290,17 @@ fun submitFinalCalculation(
     hamaliVendorName: String,
     hamaliType: String,
     outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>>,
+    categorizedLrnos: Map<String, List<String>>,
     navController: NavController,
     sharedViewModel: SharedViewModel,
     onFailure: (String) -> Unit,
-    onSuccess: (String) -> Unit
+    onSuccess: (String, String) -> Unit
 ) {
+    Log.d(
+        "FinalCalculation",
+        "submitFinalCalculation called with username: $username, depot: $depot, loadingSheetNo: $loadingSheetNo"
+    )
+
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/final_outward_calculation.php"
 
@@ -269,6 +317,8 @@ fun submitFinalCalculation(
         put("hamaliVendorName", hamaliVendorName)
         put("hamaliType", hamaliType)
 
+        Log.d("FinalCalculation", "Processing outwardScannedData: $outwardScannedData")
+
         val scannedDataArray = JSONArray()
         outwardScannedData.forEach { (lrno, pkgData) ->
             val (pkgNo, scannedBoxes) = pkgData
@@ -277,15 +327,28 @@ fun submitFinalCalculation(
                 put("TotalPkgNo", pkgNo)
                 put("ScannedBoxes", JSONArray(scannedBoxes))
             }
+            Log.d("FinalCalculation", "Adding scanned item: $scannedItemJson")
             scannedDataArray.put(scannedItemJson)
         }
         put("outwardScannedData", scannedDataArray)
+        Log.d("FinalCalculation", "JSON Request built: $this")
+
+        val categorizedJson = JSONObject()
+        categorizedLrnos.forEach { (loadingSheet, lrnos) ->
+            val lrnoArray = JSONArray()
+            lrnos.forEach { lrno ->
+                lrnoArray.put(lrno)
+            }
+            categorizedJson.put(loadingSheet, lrnoArray)
+        }
+        put("categorizedLrnos", categorizedJson)
     }
 
     val requestBody =
         jsonRequest.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
 
     val request = Request.Builder().url(url).post(requestBody).build()
+    Log.d("FinalCalculation", "Request built successfully. Sending request...")
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
@@ -294,6 +357,7 @@ fun submitFinalCalculation(
         }
 
         override fun onResponse(call: Call, response: Response) {
+            Log.d("FinalCalculation", "Received response. Code: ${response.code}")
             response.use {
                 if (!it.isSuccessful) {
                     Log.e("FinalCalculation", "Server error: ${it.code}")
@@ -301,10 +365,11 @@ fun submitFinalCalculation(
                     return
                 }
                 val responseBody = it.body?.string()
-                Log.d("FinalCalculation", "Response: $responseBody")
+                Log.d("FinalCalculation", "Response body: $responseBody")
 
                 try {
                     val jsonResponse = JSONObject(responseBody ?: "{}")
+                    Log.d("FinalCalculation", "Parsed JSON response: $jsonResponse")
                     val success = jsonResponse.optBoolean("success", false)
                     val message = jsonResponse.optString("message", "Unknown response")
 
@@ -312,24 +377,49 @@ fun submitFinalCalculation(
                         if (success) {
                             Log.d("FinalCalculation", "Success: $message")
 
-                            // Extract drsThcMapping from response
-                            val drsThcMappingJson = jsonResponse.optJSONObject("drsThcMapping")
-                            var generatedNumber = "N/A"
-                            if (drsThcMappingJson != null) {
-                                val keys = drsThcMappingJson.keys()
-                                val numbers = mutableListOf<String>()
-                                while (keys.hasNext()) {
-                                    val key = keys.next()
-                                    numbers.add(drsThcMappingJson.optString(key, ""))
+                            val manifestNumberRaw = jsonResponse.optString("manifestNumber", "").trim()
+                            val manifestNumber = if (manifestNumberRaw.equals("null", ignoreCase = true)) "" else manifestNumberRaw
+                            var generatedNumber = if (manifestNumber.isNotEmpty()) {
+                                Log.d("FinalCalculation", "Using manifestNumber: $manifestNumber")
+                                manifestNumber
+                            } else {
+                                // Extract drsThcMapping from response
+                                val drsThcMappingJson = jsonResponse.optJSONObject("drsThcMapping")
+                                var mappingNumber = "N/A"
+                                if (drsThcMappingJson != null) {
+                                    Log.d(
+                                        "FinalCalculation",
+                                        "drsThcMapping found: $drsThcMappingJson"
+                                    )
+                                    val keys = drsThcMappingJson.keys()
+                                    val numbers = mutableListOf<String>()
+                                    while (keys.hasNext()) {
+                                        val key = keys.next()
+                                        val number = drsThcMappingJson.optString(key, "")
+                                        Log.d(
+                                            "FinalCalculation",
+                                            "drsThcMapping: key = $key, value = $number"
+                                        )
+                                        numbers.add(number)
+                                    }
+                                    if (numbers.isNotEmpty()) {
+                                        mappingNumber = numbers.joinToString(", ")
+                                        Log.d(
+                                            "FinalCalculation",
+                                            "Generated number(s): $mappingNumber"
+                                        )
+                                    }
+                                } else {
+                                    Log.d("FinalCalculation", "No drsThcMapping found in response")
                                 }
-                                if (numbers.isNotEmpty()) {
-                                    // Join multiple THC numbers with a comma, or choose as needed
-                                    generatedNumber = numbers.joinToString(", ")
-                                }
+                                mappingNumber
                             }
-                            onSuccess(generatedNumber)
+                            val additionalMsg = jsonResponse.optString("additionalMessage", "")
+                            onSuccess(generatedNumber, additionalMsg)
+                            Log.d("FinalCalculation", "Clearing outward data in sharedViewModel")
                             sharedViewModel.clearOutwardData()
                         } else {
+                            Log.e("FinalCalculation", "Failure response received: $message")
                             onFailure(message)
                         }
                     }
