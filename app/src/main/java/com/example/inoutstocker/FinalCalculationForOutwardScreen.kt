@@ -1,18 +1,23 @@
 package com.example.inoutstocker
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.compose.material3.AlertDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -49,6 +55,8 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +84,16 @@ fun FinalCalculationForOutwardScreen(
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorModalMessage by remember { mutableStateOf("") }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            capturedImage = bitmap
+        }
+    }
 
     // Fetch total weight and quantity from scanned data
     LaunchedEffect(outwardScannedData) {
@@ -174,39 +192,63 @@ fun FinalCalculationForOutwardScreen(
             }
 
             item {
+                if (capturedImage != null) {
+                    Image(
+                        bitmap = capturedImage!!.asImageBitmap(),
+                        contentDescription = "Captured Image Preview",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    )
+                }
+            }
+
+            item {
                 Box(
                     modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
                 ) {
-                    Button(
-                        onClick = {
-                            submitFinalCalculation(username = username,
-                                depot = depot,
-                                loadingSheetNo = loadingSheetNo,
-                                totalQty = totalQty,
-                                totalWeight = totalWeight,
-                                groupCode = groupCode,
-                                totalAmount = totalAmount,
-                                deductionAmount = deductionAmount.toIntOrNull() ?: 0,
-                                finalAmount = finalAmount,
-                                hamaliVendorName = hamaliVendorName,
-                                hamaliType = hamaliType,
-                                outwardScannedData = outwardScannedData,
-                                categorizedLrnos = sharedViewModel.categorizedLrnos,
-                                navController = navController,
-                                sharedViewModel = sharedViewModel,
-                                onFailure = { error ->
-                                    Log.e("FinalCalculation", "Error: $error")
-                                    errorModalMessage = error
-                                    showErrorDialog = true
-                                },
-                                onSuccess = { drsThcNumber, additionalMsg ->
-                                    drsThcMapping = drsThcNumber
-                                    additionalMessage = additionalMsg
-                                    showDialog = true
-                                })
-                        }, modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Submit")
+                    if (capturedImage == null) {
+                        // "Next" button opens the camera
+                        Button(
+                            onClick = { cameraLauncher.launch() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Next")
+                        }
+                    } else {
+                        // Once an image is captured, show the "Submit" button
+                        Button(
+                            onClick = {
+                                submitFinalCalculation(username = username,
+                                    depot = depot,
+                                    loadingSheetNo = loadingSheetNo,
+                                    totalQty = totalQty,
+                                    totalWeight = totalWeight,
+                                    groupCode = groupCode,
+                                    totalAmount = totalAmount,
+                                    deductionAmount = deductionAmount.toIntOrNull() ?: 0,
+                                    finalAmount = finalAmount,
+                                    hamaliVendorName = hamaliVendorName,
+                                    hamaliType = hamaliType,
+                                    outwardScannedData = outwardScannedData,
+                                    categorizedLrnos = sharedViewModel.categorizedLrnos,
+                                    capturedImage = capturedImage,
+                                    navController = navController,
+                                    sharedViewModel = sharedViewModel,
+                                    onFailure = { error ->
+                                        Log.e("FinalCalculation", "Error: $error")
+                                        errorModalMessage = error
+                                        showErrorDialog = true
+                                    },
+                                    onSuccess = { drsThcNumber, additionalMsg ->
+                                        drsThcMapping = drsThcNumber
+                                        additionalMessage = additionalMsg
+                                        showDialog = true
+                                    })
+                            }, modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Submit")
+                        }
                     }
                 }
             }
@@ -291,6 +333,7 @@ fun submitFinalCalculation(
     hamaliType: String,
     outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>>,
     categorizedLrnos: Map<String, List<String>>,
+    capturedImage: Bitmap?,
     navController: NavController,
     sharedViewModel: SharedViewModel,
     onFailure: (String) -> Unit,
@@ -342,6 +385,15 @@ fun submitFinalCalculation(
             categorizedJson.put(loadingSheet, lrnoArray)
         }
         put("categorizedLrnos", categorizedJson)
+
+        // Convert the captured image to a Base64 string and add it to the JSON payload
+        capturedImage?.let { bitmap ->
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+            val imageBytes = stream.toByteArray()
+            val base64Image = Base64.encodeToString(imageBytes, Base64.DEFAULT)
+            put("capturedImage", base64Image)
+        }
     }
 
     val requestBody =
@@ -377,8 +429,13 @@ fun submitFinalCalculation(
                         if (success) {
                             Log.d("FinalCalculation", "Success: $message")
 
-                            val manifestNumberRaw = jsonResponse.optString("manifestNumber", "").trim()
-                            val manifestNumber = if (manifestNumberRaw.equals("null", ignoreCase = true)) "" else manifestNumberRaw
+                            val manifestNumberRaw =
+                                jsonResponse.optString("manifestNumber", "").trim()
+                            val manifestNumber = if (manifestNumberRaw.equals(
+                                    "null",
+                                    ignoreCase = true
+                                )
+                            ) "" else manifestNumberRaw
                             var generatedNumber = if (manifestNumber.isNotEmpty()) {
                                 Log.d("FinalCalculation", "Using manifestNumber: $manifestNumber")
                                 manifestNumber

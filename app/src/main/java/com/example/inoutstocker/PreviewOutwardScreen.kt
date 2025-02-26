@@ -86,39 +86,84 @@ fun PreviewOutwardScreen(
     var isDataFetched by remember { mutableStateOf(false) }
 
 //    LaunchedEffect(loadingSheetNo) {
+//        // First check in DRS
 //        val drsResults =
 //            fetchLrnosFromServer(outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos.php")
-//        val thcResults =
-//            fetchLrnosFromServer(outwardScannedLrnos, thcLoadingSheets, "fetch_thc_lrnos.php")
+//        categorizedLrnos = drsResults.first
+//        var remainingLrnos = drsResults.second  // LRNO not found in DRS
 //
-//        // Combine categorized results
-//        categorizedLrnos = drsResults.first + thcResults.first
-//        excessLrnos = drsResults.second + thcResults.second
+//        if (remainingLrnos.isNotEmpty()) {
+//            // Now check remaining LRNO in THC
+//            val thcResults =
+//                fetchLrnosFromServer(remainingLrnos, thcLoadingSheets, "fetch_thc_lrnos.php")
+//            // Merge categorized LRNO from THC into the existing map
+//            categorizedLrnos = categorizedLrnos + thcResults.first
+//            // Only those LRNO not found in THC become final excess LRNO
+//            excessLrnos = thcResults.second
+//        } else {
+//            excessLrnos = emptyList()
+//        }
+//
+//        // Store the categorized LR mapping in the SharedViewModel
+//        sharedViewModel.updateCategorizedLrnos(categorizedLrnos)
+//        Log.d("CategorizedMapping", "Stored mapping ::::::::=::::::: $categorizedLrnos")
+//
 //    }
 
     LaunchedEffect(loadingSheetNo) {
-        // First check in DRS
-        val drsResults =
-            fetchLrnosFromServer(outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos.php")
-        categorizedLrnos = drsResults.first
-        var remainingLrnos = drsResults.second  // LRNO not found in DRS
+        when {
+            // Both DRS and THC sheets are available
+            drsLoadingSheets.isNotEmpty() && thcLoadingSheets.isNotEmpty() -> {
+                val drsResults = fetchLrnosFromServer(
+                    outwardScannedLrnos,
+                    drsLoadingSheets,
+                    "fetch_drs_lrnos.php"
+                )
+                categorizedLrnos = drsResults.first
+                var remainingLrnos = drsResults.second  // LRNO not found in DRS
 
-        if (remainingLrnos.isNotEmpty()) {
-            // Now check remaining LRNO in THC
-            val thcResults =
-                fetchLrnosFromServer(remainingLrnos, thcLoadingSheets, "fetch_thc_lrnos.php")
-            // Merge categorized LRNO from THC into the existing map
-            categorizedLrnos = categorizedLrnos + thcResults.first
-            // Only those LRNO not found in THC become final excess LRNO
-            excessLrnos = thcResults.second
-        } else {
-            excessLrnos = emptyList()
+                if (remainingLrnos.isNotEmpty()) {
+                    val thcResults = fetchLrnosFromServer(
+                        remainingLrnos,
+                        thcLoadingSheets,
+                        "fetch_thc_lrnos.php"
+                    )
+                    categorizedLrnos = categorizedLrnos + thcResults.first
+                    excessLrnos = thcResults.second
+                } else {
+                    excessLrnos = emptyList()
+                }
+            }
+            // Only DRS sheets available
+            drsLoadingSheets.isNotEmpty() -> {
+                val drsResults = fetchLrnosFromServer(
+                    outwardScannedLrnos,
+                    drsLoadingSheets,
+                    "fetch_drs_lrnos.php"
+                )
+                categorizedLrnos = drsResults.first
+                excessLrnos = drsResults.second
+            }
+            // Only THC sheets available
+            thcLoadingSheets.isNotEmpty() -> {
+                val thcResults = fetchLrnosFromServer(
+                    outwardScannedLrnos,
+                    thcLoadingSheets,
+                    "fetch_thc_lrnos.php"
+                )
+                categorizedLrnos = thcResults.first
+                excessLrnos = thcResults.second
+            }
+            // No valid loading sheets provided
+            else -> {
+                categorizedLrnos = emptyMap()
+                excessLrnos = emptyList()
+            }
         }
 
-        // Store the categorized LR mapping in the SharedViewModel
+        // Update the SharedViewModel with the categorized mapping
         sharedViewModel.updateCategorizedLrnos(categorizedLrnos)
         Log.d("CategorizedMapping", "Stored mapping ::::::::=::::::: $categorizedLrnos")
-
     }
 
     Log.d("PreviewOutwardScreen", "Received Group Code: $groupCode")
@@ -183,10 +228,10 @@ fun PreviewOutwardScreen(
                     Text(
                         "Excess LR Numbers",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = Color.Red
+                        color = Color(0xFFFFA500)
                     )
                     excessLrnos.forEach { lrno ->
-                        Text("LRNO: $lrno", color = Color.Red)
+                        Text("LRNO: $lrno", color = Color(0xFFFFA500))
                     }
                 }
             }
