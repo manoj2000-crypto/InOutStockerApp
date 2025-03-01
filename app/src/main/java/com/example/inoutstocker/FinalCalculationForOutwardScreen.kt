@@ -56,6 +56,9 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 import android.util.Base64
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +89,8 @@ fun FinalCalculationForOutwardScreen(
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
+    var selectedGateNumber by remember { mutableIntStateOf(1) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -103,7 +108,10 @@ fun FinalCalculationForOutwardScreen(
 
     // Fetch hamali rates based on selected vendor and type
     LaunchedEffect(hamaliVendorName, hamaliType) {
-        if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
+        if (hamaliVendorName == "No Hamali Vendor") {
+            totalAmount = 0
+            finalAmount = 0
+        } else if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
             fetchHamaliRates(
                 hamaliVendorName, depot
             ) { regular, crossing, regularBag, crossingBag ->
@@ -142,7 +150,7 @@ fun FinalCalculationForOutwardScreen(
             item { Text("Loading Sheet No: $loadingSheetNo") }
             item { Text("Total Quantity: $totalQty") }
             item { Text("Total Weight: $totalWeight") }
-            item { Text("Outward Scanned Data: $outwardScannedData") }
+//            item { Text("Outward Scanned Data: $outwardScannedData") }
             // Hamali Vendor Dropdown
             item {
                 HamaliVendorDropdown(
@@ -177,7 +185,8 @@ fun FinalCalculationForOutwardScreen(
                     onValueChange = { deductionAmount = it },
                     label = { Text("Deduction Amount") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = hamaliVendorName != "No Hamali Vendor"
                 )
             }
 
@@ -188,6 +197,24 @@ fun FinalCalculationForOutwardScreen(
                     label = { Text("Final Amount") },
                     enabled = false,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                DropdownMenuField(
+                    label = "Gate Number",
+                    options = listOf(
+                        "Gate no 1",
+                        "Gate no 2",
+                        "Gate no 3",
+                        "Gate no 4",
+                        "Gate no 5"
+                    ),
+                    selectedOption = "Gate no $selectedGateNumber",
+                    onOptionSelected = { option ->
+                        // Extract digits from the option (assumes format "Gate no X")
+                        selectedGateNumber = option.filter { it.isDigit() }.toIntOrNull() ?: 1
+                    }
                 )
             }
 
@@ -217,37 +244,45 @@ fun FinalCalculationForOutwardScreen(
                         }
                     } else {
                         // Once an image is captured, show the "Submit" button
-                        Button(
-                            onClick = {
-                                submitFinalCalculation(username = username,
-                                    depot = depot,
-                                    loadingSheetNo = loadingSheetNo,
-                                    totalQty = totalQty,
-                                    totalWeight = totalWeight,
-                                    groupCode = groupCode,
-                                    totalAmount = totalAmount,
-                                    deductionAmount = deductionAmount.toIntOrNull() ?: 0,
-                                    finalAmount = finalAmount,
-                                    hamaliVendorName = hamaliVendorName,
-                                    hamaliType = hamaliType,
-                                    outwardScannedData = outwardScannedData,
-                                    categorizedLrnos = sharedViewModel.categorizedLrnos,
-                                    capturedImage = capturedImage,
-                                    navController = navController,
-                                    sharedViewModel = sharedViewModel,
-                                    onFailure = { error ->
-                                        Log.e("FinalCalculation", "Error: $error")
-                                        errorModalMessage = error
-                                        showErrorDialog = true
-                                    },
-                                    onSuccess = { drsThcNumber, additionalMsg ->
-                                        drsThcMapping = drsThcNumber
-                                        additionalMessage = additionalMsg
-                                        showDialog = true
-                                    })
-                            }, modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Submit")
+                        if (!isSubmitting) {
+                            Button(
+                                onClick = {
+                                    isSubmitting = true
+                                    submitFinalCalculation(username = username,
+                                        depot = depot,
+                                        loadingSheetNo = loadingSheetNo,
+                                        totalQty = totalQty,
+                                        totalWeight = totalWeight,
+                                        groupCode = groupCode,
+                                        totalAmount = totalAmount,
+                                        deductionAmount = deductionAmount.toIntOrNull() ?: 0,
+                                        finalAmount = finalAmount,
+                                        hamaliVendorName = hamaliVendorName,
+                                        gateNumber = selectedGateNumber,
+                                        hamaliType = hamaliType,
+                                        outwardScannedData = outwardScannedData,
+                                        categorizedLrnos = sharedViewModel.categorizedLrnos,
+                                        capturedImage = capturedImage,
+                                        navController = navController,
+                                        sharedViewModel = sharedViewModel,
+                                        onFailure = { error ->
+                                            Log.e("FinalCalculation", "Error: $error")
+                                            errorModalMessage = error
+                                            isSubmitting = false
+                                            showErrorDialog = true
+                                        },
+                                        onSuccess = { drsThcNumber, additionalMsg ->
+                                            drsThcMapping = drsThcNumber
+                                            additionalMessage = additionalMsg
+                                            isSubmitting = false
+                                            showDialog = true
+                                        })
+                                }, modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Submit")
+                            }
+                        } else {
+                            LottieAnimationView()
                         }
                     }
                 }
@@ -264,7 +299,16 @@ fun FinalCalculationForOutwardScreen(
             }
         },
             title = { Text("Generated Number") },
-            text = { Text("DRS/THC/MF Number: $drsThcMapping \n-------\nMessage: $additionalMessage") },
+//            text = { Text("DRS/THC/MF Number: $drsThcMapping \n-------\nMessage: $additionalMessage") },
+            text = {
+                Column {
+                    Text("DRS/THC/MF Number: $drsThcMapping")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Message: $additionalMessage")
+                }
+            },
             confirmButton = {
                 Button(onClick = {
                     showDialog = false
@@ -330,6 +374,7 @@ fun submitFinalCalculation(
     deductionAmount: Int,
     finalAmount: Int,
     hamaliVendorName: String,
+    gateNumber: Int,
     hamaliType: String,
     outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>>,
     categorizedLrnos: Map<String, List<String>>,
@@ -358,6 +403,7 @@ fun submitFinalCalculation(
         put("deductionAmount", deductionAmount)
         put("finalAmount", finalAmount)
         put("hamaliVendorName", hamaliVendorName)
+        put("gateNumber", gateNumber)
         put("hamaliType", hamaliType)
 
         Log.d("FinalCalculation", "Processing outwardScannedData: $outwardScannedData")
