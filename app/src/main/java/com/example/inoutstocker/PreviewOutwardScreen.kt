@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -32,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -84,31 +87,8 @@ fun PreviewOutwardScreen(
     var totalWeight by remember { mutableStateOf(0.0) }
     var totalQtyScanned by remember { mutableStateOf(0) }
     var isDataFetched by remember { mutableStateOf(false) }
-
-//    LaunchedEffect(loadingSheetNo) {
-//        // First check in DRS
-//        val drsResults =
-//            fetchLrnosFromServer(outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos.php")
-//        categorizedLrnos = drsResults.first
-//        var remainingLrnos = drsResults.second  // LRNO not found in DRS
-//
-//        if (remainingLrnos.isNotEmpty()) {
-//            // Now check remaining LRNO in THC
-//            val thcResults =
-//                fetchLrnosFromServer(remainingLrnos, thcLoadingSheets, "fetch_thc_lrnos.php")
-//            // Merge categorized LRNO from THC into the existing map
-//            categorizedLrnos = categorizedLrnos + thcResults.first
-//            // Only those LRNO not found in THC become final excess LRNO
-//            excessLrnos = thcResults.second
-//        } else {
-//            excessLrnos = emptyList()
-//        }
-//
-//        // Store the categorized LR mapping in the SharedViewModel
-//        sharedViewModel.updateCategorizedLrnos(categorizedLrnos)
-//        Log.d("CategorizedMapping", "Stored mapping ::::::::=::::::: $categorizedLrnos")
-//
-//    }
+    var isCategorizing by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
 
     LaunchedEffect(loadingSheetNo) {
         when {
@@ -164,6 +144,9 @@ fun PreviewOutwardScreen(
         // Update the SharedViewModel with the categorized mapping
         sharedViewModel.updateCategorizedLrnos(categorizedLrnos)
         Log.d("CategorizedMapping", "Stored mapping ::::::::=::::::: $categorizedLrnos")
+
+        // Indicate that categorization is complete
+        isCategorizing = false
     }
 
     Log.d("PreviewOutwardScreen", "Received Group Code: $groupCode")
@@ -179,125 +162,154 @@ fun PreviewOutwardScreen(
             }
         })
     }) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp) // This ensures some space between items
-        ) {
-            item {
-                Text("Scanned LR Numbers", style = MaterialTheme.typography.headlineSmall)
+        if (isCategorizing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                LottieAnimationView()
             }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            item {
-                if (outwardScannedData.isEmpty()) {
-                    Text("No data available.", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    outwardScannedData.forEach { (lrno, pkgNoPair) ->
-                        val (pkgNo, scannedBoxes) = pkgNoPair
-                        OutwardItem(lrno, pkgNo, scannedBoxes)
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Display categorized LR numbers under each Loading Sheet
-            categorizedLrnos.forEach { (loadingSheet, lrnos) ->
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp) // This ensures some space between items
+            ) {
                 item {
-                    Text(
-                        "Loading Sheet: $loadingSheet",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    lrnos.forEach { lrno ->
-                        Text("LRNO: $lrno")
-                    }
+                    Text("Scanned LR Numbers", style = MaterialTheme.typography.headlineSmall)
+                }
+                item {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-            }
 
-            // Display excess LR numbers that don't belong to any Loading Sheet
-            if (excessLrnos.isNotEmpty()) {
                 item {
-                    Text(
-                        "Excess LR Numbers",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color(0xFFFFA500)
-                    )
-                    excessLrnos.forEach { lrno ->
-                        Text("LRNO: $lrno", color = Color(0xFFFFA500))
-                    }
-                }
-            }
-
-            // Get Data Button and Loader
-            item {
-                Button(
-                    onClick = {
-                        isLoading = true
-                        fetchWeightsFromServer(
-                            categorizedLrnos, excessLrnos, outwardScannedData
-                        ) { totalQty, weight ->
-                            totalWeight = weight
-                            totalQtyScanned = totalQty
-                            isLoading = false
-                            isDataFetched = totalQty > 0 && weight > 0.0
+                    if (outwardScannedData.isEmpty()) {
+                        Text("No data available.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        outwardScannedData.forEach { (lrno, pkgNoPair) ->
+                            val (pkgNo, scannedBoxes) = pkgNoPair
+                            OutwardItem(lrno, pkgNo, scannedBoxes)
                         }
-                    }, modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Get Data")
+                    }
                 }
-            }
 
-            if (isLoading) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CircularProgressIndicator()
-                }
-            }
-
-            if (totalQtyScanned > 0) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Total Quantity: $totalQtyScanned",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Green
-                    )
-                }
-            }
-
-            if (totalWeight > 0.0) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Total Weight: $totalWeight",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Green
-                    )
-                }
-            }
-
-            // Show the button only if data is fetched
-            if (isDataFetched) {
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            sharedViewModel.setOutwardScannedData(outwardScannedData)
-                            val encodedTotalWeight = Uri.encode(totalWeight.toString())
-                            val encodedGroupCode = Uri.encode(groupCode)
-                            navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight/$encodedGroupCode")
-                        }, modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Proceed to Final Calculation")
+                }
+
+                // Display categorized LR numbers under each Loading Sheet
+                categorizedLrnos.forEach { (loadingSheet, lrnos) ->
+                    item {
+                        Text(
+                            "Loading Sheet: $loadingSheet",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        lrnos.forEach { lrno ->
+                            Text("LRNO: $lrno")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
+                }
+
+                // Display excess LR numbers that don't belong to any Loading Sheet
+                if (excessLrnos.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Excess LR Numbers",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color(0xFFFFA500)
+                        )
+                        excessLrnos.forEach { lrno ->
+                            Text("LRNO: $lrno", color = Color(0xFFFFA500))
+                        }
+                    }
+                }
+
+                // Get Data Button and Loader
+                item {
+                    if (isLoading) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LottieAnimationView()
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                isLoading = true
+                                fetchWeightsFromServer(
+                                    categorizedLrnos, excessLrnos, outwardScannedData
+                                ) { totalQty, weight ->
+                                    totalWeight = weight
+                                    totalQtyScanned = totalQty
+                                    isLoading = false
+                                    isDataFetched = totalQty > 0 && weight > 0.0
+                                }
+                            }, modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading && !isDataFetched
+                        ) {
+                            Text("Get Data")
+                        }
+                    }
+                }
+
+//                if (isLoading) {
+//                    item {
+//                        Spacer(modifier = Modifier.height(8.dp))
+//                        CircularProgressIndicator()
+//                    }
+//                }
+
+                if (totalQtyScanned > 0) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Total Quantity: $totalQtyScanned",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Green
+                        )
+                    }
+                }
+
+                if (totalWeight > 0.0) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Total Weight: $totalWeight",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Green
+                        )
+                    }
+                }
+
+                // Show the button only if data is fetched
+                if (isDataFetched) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                sharedViewModel.setOutwardScannedData(outwardScannedData)
+                                val encodedTotalWeight = Uri.encode(totalWeight.toString())
+                                val encodedGroupCode = Uri.encode(groupCode)
+                                navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight/$encodedGroupCode")
+                            }, modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Proceed to Final Calculation")
+                        }
+                    }
+                }
+            }
+
+            // Scroll to the last item when data is fetched:
+            LaunchedEffect(isDataFetched) {
+                if (isDataFetched) {
+                    listState.animateScrollToItem(index = listState.layoutInfo.totalItemsCount - 1)
                 }
             }
         }
