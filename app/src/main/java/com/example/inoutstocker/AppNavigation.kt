@@ -124,7 +124,7 @@ fun AppNavigation(
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
 
             // Clear only Outward-related data
-            sharedViewModel.clearOutwardData()
+//            sharedViewModel.clearOutwardData()
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
 
             OutwardScreen(navController, username, depot, sharedViewModel)
