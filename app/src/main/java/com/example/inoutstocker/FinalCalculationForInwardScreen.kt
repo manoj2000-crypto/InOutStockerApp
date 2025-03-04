@@ -71,8 +71,16 @@ fun FinalCalculationForInwardScreen(
     val decodedPrnOrThc = java.net.URLDecoder.decode(prnOrThc, "UTF-8")
     val decodedPrn = java.net.URLDecoder.decode(prn, "UTF-8")
 
-    var totalQty by remember { mutableIntStateOf(0) }
-    var totalWeight by remember { mutableDoubleStateOf(0.0) }
+//    var totalQty by remember { mutableIntStateOf(0) }
+//    var totalWeight by remember { mutableDoubleStateOf(0.0) }
+    var totalBoxQty by remember { mutableDoubleStateOf(0.0) }
+    var totalBoxWeight by remember { mutableDoubleStateOf(0.0) }
+    var totalBagQty by remember { mutableDoubleStateOf(0.0) }
+    var totalBagWeight by remember { mutableDoubleStateOf(0.0) }
+    var pkgType by remember { mutableStateOf("") }
+
+    var totalAllQtySum by remember { mutableDoubleStateOf(0.0) }
+    var totalAllWeightSum by remember { mutableDoubleStateOf(0.0) }
 
     val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -80,9 +88,14 @@ fun FinalCalculationForInwardScreen(
 
     // Calculate TotalBagQty and TotalBoxQty from scannedItems
     LaunchedEffect(scannedItems) {
-        totalQty = scannedItems.flatMap { it.second.second }.size
-        fetchWeightsFromServer(scannedItems) { weight ->
-            totalWeight = weight
+        fetchWeightsFromServer(scannedItems) { totals ->
+            totalBoxQty = totals.totalBoxQty
+            totalBoxWeight = totals.totalBoxWeight
+            totalBagQty = totals.totalBagQty
+            totalBagWeight = totals.totalBagWeight
+
+            totalAllQtySum = totalBoxQty + totalBagQty
+            totalAllWeightSum = totalBoxWeight + totalBagWeight
         }
     }
 
@@ -150,34 +163,74 @@ fun FinalCalculationForInwardScreen(
     Log.d("FinalCalculationScreen", "Username: $username, Depot: $depot")
 
 
+//    LaunchedEffect(hamaliVendorName, hamaliType) {
+//        if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
+//            fetchHamaliRates(
+//                hamaliVendorName, depot
+//            ) { regular, crossing, regularBag, crossingBag ->
+//                val rate = when (hamaliType) {
+//                    "REGULAR" -> if (regular > 0) regular else regularBag
+//                    "CROSSING" -> if (crossing > 0) crossing else crossingBag
+//                    else -> 0.0
+//                }
+//
+//                // Calculate Total Amount
+//                val boxQty = totalQty
+//                val weightInTons = totalWeight / 1000 // Convert weight to tons
+//                val totalBoxCost = boxQty * rate
+//                val totalBagCost = weightInTons * rate
+//                totalAmount = (totalBoxCost + totalBagCost).toInt()
+//
+//                // Update Final Amount based on deductions
+//                finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
+//
+//                Log.d(
+//                    "HamaliCalculation",
+//                    "Rate: $rate, Total Amount: $totalAmount, Final Amount: $finalAmount"
+//                )
+//            }
+//        }
+//    }
+
     LaunchedEffect(hamaliVendorName, hamaliType) {
         if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
             fetchHamaliRates(
-                hamaliVendorName, depot
+                hamaliVendorName,
+                depot
             ) { regular, crossing, regularBag, crossingBag ->
-                val rate = when (hamaliType) {
-                    "REGULAR" -> if (regular > 0) regular else regularBag
-                    "CROSSING" -> if (crossing > 0) crossing else crossingBag
-                    else -> 0.0
+                var boxAmount = 0.0
+                var bagAmount = 0.0
+
+                if (hamaliType.equals("REGULAR", ignoreCase = true)) {
+                    if (regular > 0) {
+                        boxAmount = totalBoxQty * regular
+                    }
+                    if (regularBag > 0) {
+                        bagAmount = (totalBagWeight / 1000) * regularBag
+                    }
+                } else if (hamaliType.equals("CROSSING", ignoreCase = true)) {
+                    if (crossing > 0) {
+                        boxAmount = totalBoxQty * crossing
+                    }
+                    if (crossingBag > 0) {
+                        bagAmount = (totalBagWeight / 1000) * crossingBag
+                    }
                 }
 
-                // Calculate Total Amount
-                val boxQty = totalQty
-                val weightInTons = totalWeight / 1000 // Convert weight to tons
-                val totalBoxCost = boxQty * rate
-                val totalBagCost = weightInTons * rate
-                totalAmount = (totalBoxCost + totalBagCost).toInt()
-
-                // Update Final Amount based on deductions
+                totalAmount = (boxAmount + bagAmount).toInt()
                 finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
-
                 Log.d(
                     "HamaliCalculation",
-                    "Rate: $rate, Total Amount: $totalAmount, Final Amount: $finalAmount"
+                    "hamaliType: $hamaliType, Regular: $regular, Crossing: $crossing, RegularBag: $regularBag, CrossingBag: $crossingBag"
+                )
+                Log.d(
+                    "HamaliCalculation",
+                    "Box Amount: $boxAmount, Bag Amount: $bagAmount, Total Amount: $totalAmount, Final Amount: $finalAmount"
                 )
             }
         }
     }
+
 
     LaunchedEffect(deductionAmount) {
         finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
@@ -199,10 +252,23 @@ fun FinalCalculationForInwardScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text("Total Quantity: $totalQty")
+                Text("Total Box Qty: $totalBoxQty")
             }
             item {
-                Text("Total Weight: $totalWeight")
+                Text("Total Box Weight: $totalBoxWeight")
+            }
+            item {
+                Text("Total Bag Qty: $totalBagQty")
+            }
+            item {
+                Text("Total Bag Weight: $totalBagWeight")
+            }
+
+            item {
+                Text("Total Qty: $totalAllQtySum")
+            }
+            item {
+                Text("Total Weight: $totalAllWeightSum")
             }
 
             item {
@@ -492,13 +558,23 @@ fun fetchHamaliRates(
 }
 
 fun fetchWeightsFromServer(
-    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, onResult: (Double) -> Unit
+    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, onResult: (TotalWeights) -> Unit
 ) {
+    Log.i(
+        "fetchWeightsFromServer",
+        "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
+    )
     val client = OkHttpClient()
+
     val jsonRequest = JSONArray().apply {
         scannedItems.forEach { item ->
             val lrno = item.first
             val scannedItemCount = item.second.second.size
+
+            Log.i(
+                "fetchWeightsFromServer",
+                "Processing item - LRNO: $lrno, ScannedItemCount: $scannedItemCount"
+            )
 
             put(JSONObject().apply {
                 put("LRNO", lrno)
@@ -506,25 +582,61 @@ fun fetchWeightsFromServer(
             })
         }
     }
+    Log.i("fetchWeightsFromServer", "Constructed JSON Request: ${jsonRequest.toString()}")
 
     val body = jsonRequest.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
+//    val request =
+//        Request.Builder().url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php")
+//            .post(body).build()
+
     val request =
-        Request.Builder().url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php")
+        Request.Builder().url("https://vtc3pl.com/TEST_FILE_INWARD.php")
             .post(body).build()
+
+    Log.i(
+        "fetchWeightsFromServer",
+        "HTTP Request built with URL: https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php"
+    )
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
+            Log.i("fetchWeightsFromServer", "onFailure triggered")
             Log.e("fetchWeightsFromServer", "Request failed: ${e.message}")
         }
 
         override fun onResponse(call: Call, response: Response) {
+            Log.i(
+                "fetchWeightsFromServer",
+                "onResponse triggered with status code: ${response.code}"
+            )
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
+                Log.i("fetchWeightsFromServer", "Response body received: $responseBody")
                 val jsonResponse = JSONObject(responseBody ?: "{}")
-                val totalWeight = jsonResponse.optDouble("TotalWeight", 0.0)
-                onResult(totalWeight)
+
+                val totalBoxQty = jsonResponse.optDouble("TotalBoxQty", 0.0)
+                val totalBoxWeight = jsonResponse.optDouble("TotalBoxWeight", 0.0)
+                val totalBagQty = jsonResponse.optDouble("TotalBagQty", 0.0)
+                val totalBagWeight = jsonResponse.optDouble("TotalBagWeight", 0.0)
+                val pkgType = jsonResponse.optString("PkgType", "")
+
+//                val totalWeight = jsonResponse.optDouble("TotalWeight", 0.0)
+                Log.i(
+                    "fetchWeightsFromServer",
+                    "Parsed totals - BoxQty: $totalBoxQty, BoxWeight: $totalBoxWeight, BagQty: $totalBagQty, BagWeight: $totalBagWeight"
+                )
+                onResult(
+                    TotalWeights(
+                        totalBoxQty,
+                        totalBoxWeight,
+                        totalBagQty,
+                        totalBagWeight,
+                        pkgType
+                    )
+                )
             } else {
+                Log.i("fetchWeightsFromServer", "Response not successful: ${response.message}")
                 Log.e("fetchWeightsFromServer", "Error: ${response.message}")
             }
         }
@@ -740,3 +852,11 @@ fun submitDataToServer(
         }
     })
 }
+
+data class TotalWeights(
+    val totalBoxQty: Double,
+    val totalBoxWeight: Double,
+    val totalBagQty: Double,
+    val totalBagWeight: Double,
+    val pkgType: String
+)
