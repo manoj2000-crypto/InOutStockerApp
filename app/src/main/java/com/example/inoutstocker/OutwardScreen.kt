@@ -263,6 +263,8 @@ fun TableView(
                         LabelWithValue(label = "Weight", value = row.weight.toString())
                         Spacer(modifier = Modifier.height(4.dp))
                         LabelWithValue(label = "DRS or THC", value = row.drsOrThc)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LabelWithValue(label = "Location", value = row.location)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -350,7 +352,8 @@ suspend fun fetchData(
                             vehicleNo = item.getString("vehicleno"),
                             driverName = item.getString("drivername"),
                             driverContact = item.getString("driverno"),
-                            arrivalDate = item.getString("arrivaldate")
+                            arrivalDate = item.getString("arrivaldate"),
+                            location = item.getString("location")
                         )
                     }
                     Log.i("fetchData", "Parsed Table Data: $tableData")
@@ -378,5 +381,6 @@ data class TableRowData(
     val vehicleNo: String,
     val driverName: String,
     val driverContact: String,
-    val arrivalDate: String
+    val arrivalDate: String,
+    val location: String
 )
