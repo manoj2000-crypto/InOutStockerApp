@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -89,6 +88,11 @@ fun PreviewOutwardScreen(
     var isDataFetched by remember { mutableStateOf(false) }
     var isCategorizing by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
+
+    var totalBoxQty by remember { mutableStateOf(0) }
+    var totalBoxWeight by remember { mutableStateOf(0.0) }
+    var totalBagQty by remember { mutableStateOf(0) }
+    var totalBagWeight by remember { mutableStateOf(0.0) }
 
     LaunchedEffect(loadingSheetNo) {
         when {
@@ -245,11 +249,16 @@ fun PreviewOutwardScreen(
                                 isLoading = true
                                 fetchWeightsFromServer(
                                     categorizedLrnos, excessLrnos, outwardScannedData
-                                ) { totalQty, weight ->
-                                    totalWeight = weight
-                                    totalQtyScanned = totalQty
+                                ) { boxQty, boxWeight, bagQty, bagWeight, pkgType ->
+                                    totalBoxQty = boxQty
+                                    totalBoxWeight = boxWeight
+                                    totalBagQty = bagQty
+                                    totalBagWeight = bagWeight
+
+                                    totalQtyScanned = totalBoxQty + totalBagQty
+                                    totalWeight = totalBoxWeight + totalBagWeight
                                     isLoading = false
-                                    isDataFetched = totalQty > 0 && weight > 0.0
+                                    isDataFetched = totalQtyScanned > 0 && totalWeight > 0.0
                                 }
                             }, modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading && !isDataFetched
@@ -258,13 +267,6 @@ fun PreviewOutwardScreen(
                         }
                     }
                 }
-
-//                if (isLoading) {
-//                    item {
-//                        Spacer(modifier = Modifier.height(8.dp))
-//                        CircularProgressIndicator()
-//                    }
-//                }
 
                 if (totalQtyScanned > 0) {
                     item {
@@ -295,9 +297,10 @@ fun PreviewOutwardScreen(
                         Button(
                             onClick = {
                                 sharedViewModel.setOutwardScannedData(outwardScannedData)
-                                val encodedTotalWeight = Uri.encode(totalWeight.toString())
+                                val encodedTotalBoxWeight = Uri.encode(totalBoxWeight.toString())
+                                val encodedTotalBagWeight = Uri.encode(totalBagWeight.toString())
                                 val encodedGroupCode = Uri.encode(groupCode)
-                                navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalQtyScanned/$encodedTotalWeight/$encodedGroupCode")
+                                navController.navigate("finalCalculationOutwardScreen/$username/$depot/$loadingSheetNo/$totalBoxQty/$encodedTotalBoxWeight/$totalBagQty/$encodedTotalBagWeight/$encodedGroupCode")
                             }, modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Proceed to Final Calculation")
@@ -321,8 +324,12 @@ fun fetchWeightsFromServer(
     categorizedLrnos: Map<String, List<String>>,
     excessLrnos: List<String>,
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, // Includes scanned counts
-    onResult: (Int, Double) -> Unit // Returns TotalQty and TotalWeight
+    onResult: (totalBoxQty: Int, totalBoxWeight: Double, totalBagQty: Int, totalBagWeight: Double, pkgType: String) -> Unit // Returns TotalQty and TotalWeight
 ) {
+    Log.i(
+        "fetchWeightsFromServer",
+        "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
+    )
     val client = OkHttpClient()
 
     val jsonRequest = JSONArray().apply {
@@ -345,29 +352,48 @@ fun fetchWeightsFromServer(
             })
         }
     }
+    Log.i("fetchWeightsFromServer", "Constructed JSON Request: ${jsonRequest.toString()}")
 
     val body = jsonRequest.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
+//    val request = Request.Builder()
+//        .url("https://vtc3pl.com/fetch_total_weight_qty_outward_inoutstocker_app.php").post(body)
+//        .build()
+
     val request = Request.Builder()
-        .url("https://vtc3pl.com/fetch_total_weight_qty_outward_inoutstocker_app.php").post(body)
+        .url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php").post(body)
         .build()
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
             Log.e("fetchWeightsFromServer", "Request failed: ${e.message}")
-            onResult(0, 0.0) // Return default values on failure
+            onResult(0, 0.0, 0, 0.0, "")
         }
 
         override fun onResponse(call: Call, response: Response) {
+            Log.i(
+                "fetchWeightsFromServer",
+                "onResponse triggered with status code: ${response.code}"
+            )
+
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
+                Log.i("fetchWeightsFromServer", "Response body received: $responseBody")
+
                 val jsonResponse = JSONObject(responseBody ?: "{}")
-                val totalQty = jsonResponse.optInt("TotalQty", 0)
-                val totalWeight = jsonResponse.optDouble("TotalWeight", 0.0)
-                onResult(totalQty, totalWeight)
+                val totalBoxQty = jsonResponse.optInt("TotalBoxQty", 0)
+                val totalBoxWeight = jsonResponse.optDouble("TotalBoxWeight", 0.0)
+                val totalBagQty = jsonResponse.optInt("TotalBagQty", 0)
+                val totalBagWeight = jsonResponse.optDouble("TotalBagWeight", 0.0)
+                val pkgType = jsonResponse.optString("PkgType", "")
+                Log.i(
+                    "fetchWeightsFromServer",
+                    "Parsed totals - BoxQty: $totalBoxQty, BoxWeight: $totalBoxWeight, BagQty: $totalBagQty, BagWeight: $totalBagWeight, pkgType: $pkgType"
+                )
+                onResult(totalBoxQty, totalBoxWeight, totalBagQty, totalBagWeight, pkgType)
             } else {
                 Log.e("fetchWeightsFromServer", "Error: ${response.message}")
-                onResult(0, 0.0)
+                onResult(0, 0.0, 0, 0.0, "")
             }
         }
     })

@@ -66,8 +66,10 @@ fun FinalCalculationForOutwardScreen(
     username: String,
     depot: String,
     loadingSheetNo: String,
-    totalQty: Int,
-    totalWeight: Double,
+    totalBoxQty: Int,
+    totalBoxWeight: Double,
+    totalBagQty: Int,
+    totalBagWeight: Double,
     groupCode: String,
     sharedViewModel: SharedViewModel,
     navController: NavController
@@ -99,30 +101,85 @@ fun FinalCalculationForOutwardScreen(
         }
     }
 
+    Log.i(
+        "FinalCalculationForOutwardScreen",
+        "Fetched totals - BoxQty: $totalBoxQty, BoxWeight: $totalBoxWeight, BagQty: $totalBagQty, BagWeight: $totalBagWeight"
+    )
+
+    var totalQty = totalBoxQty + totalBagQty
+    var totalWeight = totalBoxWeight + totalBagWeight
+
+    Log.i(
+        "FinalCalculationForOutwardScreen",
+        "totals - Qty: $totalQty, Weight: $totalWeight"
+    )
+
     // Fetch total weight and quantity from scanned data
-    LaunchedEffect(outwardScannedData) {
-        totalAmount = calculateTotalAmount(totalQty, totalWeight)
-        finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
-    }
+//    LaunchedEffect(outwardScannedData) {
+//        totalAmount = calculateTotalAmount(totalQty, totalWeight)
+//        finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
+//    }
 
     // Fetch hamali rates based on selected vendor and type
+//    LaunchedEffect(hamaliVendorName, hamaliType) {
+//        if (hamaliVendorName == "No Hamali Vendor") {
+//            totalAmount = 0
+//            finalAmount = 0
+//        } else if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
+//            fetchHamaliRates(
+//                hamaliVendorName, depot
+//            ) { regular, crossing, regularBag, crossingBag ->
+//                val rate = when (hamaliType) {
+//                    "REGULAR" -> if (regular > 0) regular else regularBag
+//                    "CROSSING" -> if (crossing > 0) crossing else crossingBag
+//                    else -> 0.0
+//                }
+//
+//                // Update totalAmount based on the rates
+//                totalAmount = calculateTotalAmount(totalQty, totalWeight, rate)
+//                finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
+//            }
+//        }
+//    }
+
     LaunchedEffect(hamaliVendorName, hamaliType) {
         if (hamaliVendorName == "No Hamali Vendor") {
             totalAmount = 0
             finalAmount = 0
         } else if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
             fetchHamaliRates(
-                hamaliVendorName, depot
+                hamaliVendorName,
+                depot
             ) { regular, crossing, regularBag, crossingBag ->
-                val rate = when (hamaliType) {
-                    "REGULAR" -> if (regular > 0) regular else regularBag
-                    "CROSSING" -> if (crossing > 0) crossing else crossingBag
-                    else -> 0.0
+                var boxAmount = 0.0
+                var bagAmount = 0.0
+
+                if (hamaliType.equals("REGULAR", ignoreCase = true)) {
+                    if (regular > 0) {
+                        boxAmount = totalBoxQty * regular
+                    }
+                    if (regularBag > 0) {
+                        bagAmount = (totalBagWeight / 1000) * regularBag
+                    }
+                } else if (hamaliType.equals("CROSSING", ignoreCase = true)) {
+                    if (crossing > 0) {
+                        boxAmount = totalBoxQty * crossing
+                    }
+                    if (crossingBag > 0) {
+                        bagAmount = (totalBagWeight / 1000) * crossingBag
+                    }
                 }
 
-                // Update totalAmount based on the rates
-                totalAmount = calculateTotalAmount(totalQty, totalWeight, rate)
+                totalAmount = (boxAmount + bagAmount).toInt()
                 finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
+                Log.d(
+                    "HamaliCalculation",
+                    "hamaliType: $hamaliType, Regular: $regular, Crossing: $crossing, RegularBag: $regularBag, CrossingBag: $crossingBag"
+                )
+                Log.d(
+                    "HamaliCalculation",
+                    "Box Amount: $boxAmount, Bag Amount: $bagAmount, Total Amount: $totalAmount, Final Amount: $finalAmount"
+                )
             }
         }
     }
@@ -537,9 +594,9 @@ fun submitFinalCalculation(
 }
 
 // Calculate Total Amount
-fun calculateTotalAmount(
-    totalQty: Int, totalWeight: Double, rate: Double = 0.0
-): Int {
-    val totalPkgAmount = totalQty * rate
-    return (totalPkgAmount + totalWeight).toInt()
-}
+//fun calculateTotalAmount(
+//    totalQty: Int, totalWeight: Double, rate: Double = 0.0
+//): Int {
+//    val totalPkgAmount = totalQty * rate
+//    return (totalPkgAmount + totalWeight).toInt()
+//}

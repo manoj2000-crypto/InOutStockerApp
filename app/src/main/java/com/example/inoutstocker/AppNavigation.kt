@@ -173,12 +173,15 @@ fun AppNavigation(
         }
 
         // Outward Final Calculation Screen
-        composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalQty}/{totalWeight}/{groupCode}") { backStackEntry ->
+        composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalBoxQty}/{totalBoxWeight}/{totalBagQty}/{totalBagWeight}/{groupCode}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             val loadingSheetNo = backStackEntry.arguments?.getString("loadingSheetNo") ?: ""
-            val totalQty = backStackEntry.arguments?.getString("totalQty")?.toIntOrNull() ?: 0
-            val totalWeight = backStackEntry.arguments?.getString("totalWeight")
+            val totalBoxQty = backStackEntry.arguments?.getString("totalBoxQty")?.toIntOrNull() ?: 0
+            val totalBoxWeight = backStackEntry.arguments?.getString("totalBoxWeight")
+                ?.let { Uri.decode(it).toDoubleOrNull() } ?: 0.0
+            val totalBagQty = backStackEntry.arguments?.getString("totalBagQty")?.toIntOrNull() ?: 0
+            val totalBagWeight = backStackEntry.arguments?.getString("totalBagWeight")
                 ?.let { Uri.decode(it).toDoubleOrNull() } ?: 0.0
             val groupCode =
                 backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
@@ -187,8 +190,10 @@ fun AppNavigation(
                 username = username,
                 depot = depot,
                 loadingSheetNo = loadingSheetNo,
-                totalQty = totalQty,
-                totalWeight = totalWeight,
+                totalBoxQty = totalBoxQty,
+                totalBoxWeight = totalBoxWeight,
+                totalBagQty = totalBagQty,
+                totalBagWeight = totalBagWeight,
                 groupCode = groupCode,
                 sharedViewModel = sharedViewModel,
                 navController = navController

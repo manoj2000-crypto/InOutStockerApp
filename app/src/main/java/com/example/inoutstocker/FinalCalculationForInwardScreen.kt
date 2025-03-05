@@ -591,7 +591,7 @@ fun fetchWeightsFromServer(
 //            .post(body).build()
 
     val request =
-        Request.Builder().url("https://vtc3pl.com/TEST_FILE_INWARD.php")
+        Request.Builder().url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php")
             .post(body).build()
 
     Log.i(
