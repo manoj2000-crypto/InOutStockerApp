@@ -162,36 +162,6 @@ fun FinalCalculationForInwardScreen(
     Log.d("FinalCalculationScreen", "PRN/THC: $decodedPrnOrThc")
     Log.d("FinalCalculationScreen", "Username: $username, Depot: $depot")
 
-
-//    LaunchedEffect(hamaliVendorName, hamaliType) {
-//        if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
-//            fetchHamaliRates(
-//                hamaliVendorName, depot
-//            ) { regular, crossing, regularBag, crossingBag ->
-//                val rate = when (hamaliType) {
-//                    "REGULAR" -> if (regular > 0) regular else regularBag
-//                    "CROSSING" -> if (crossing > 0) crossing else crossingBag
-//                    else -> 0.0
-//                }
-//
-//                // Calculate Total Amount
-//                val boxQty = totalQty
-//                val weightInTons = totalWeight / 1000 // Convert weight to tons
-//                val totalBoxCost = boxQty * rate
-//                val totalBagCost = weightInTons * rate
-//                totalAmount = (totalBoxCost + totalBagCost).toInt()
-//
-//                // Update Final Amount based on deductions
-//                finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
-//
-//                Log.d(
-//                    "HamaliCalculation",
-//                    "Rate: $rate, Total Amount: $totalAmount, Final Amount: $finalAmount"
-//                )
-//            }
-//        }
-//    }
-
     LaunchedEffect(hamaliVendorName, hamaliType) {
         if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
             fetchHamaliRates(
@@ -251,18 +221,18 @@ fun FinalCalculationForInwardScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
-                Text("Total Box Qty: $totalBoxQty")
-            }
-            item {
-                Text("Total Box Weight: $totalBoxWeight")
-            }
-            item {
-                Text("Total Bag Qty: $totalBagQty")
-            }
-            item {
-                Text("Total Bag Weight: $totalBagWeight")
-            }
+//            item {
+//                Text("Total Box Qty: $totalBoxQty")
+//            }
+//            item {
+//                Text("Total Box Weight: $totalBoxWeight")
+//            }
+//            item {
+//                Text("Total Bag Qty: $totalBagQty")
+//            }
+//            item {
+//                Text("Total Bag Weight: $totalBagWeight")
+//            }
 
             item {
                 Text("Total Qty: $totalAllQtySum")
