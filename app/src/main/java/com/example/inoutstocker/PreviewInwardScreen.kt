@@ -165,7 +165,8 @@ fun PreviewInwardScreen(
             } else {
 
                 SectionTitle(title = "PRN:")
-                ItemList(items = prnData,
+                ItemList(
+                    items = prnData,
                     processedNumbers = processedNumbers,
                     missingStatusMap = missingStatusMap,
                     scannedItems = scannedItems,
@@ -212,7 +213,8 @@ fun PreviewInwardScreen(
                                 )
                                 showArrivalConfirmation = true
                             } else {
-                                navigateToFinalCalculation("PRN",
+                                navigateToFinalCalculation(
+                                    "PRN",
                                     URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
                                     username,
                                     depot,
@@ -230,6 +232,9 @@ fun PreviewInwardScreen(
                             val lrDetails = fetchLRDetailsForToken(token = token, type = "PRN")
                             val details: List<Pair<String, String>> = lrDetails.map { detail ->
                                 val scannedRecord = scannedItems.find { it.first == detail.lrno }
+                                if (scannedRecord == null) {
+                                    Log.d("MissingLR", "LRNO not scanned at all: ${detail.lrno}")
+                                }
                                 val missing = if (scannedRecord != null) {
                                     val scannedBoxes = scannedRecord.second.second
                                     val expectedBoxes = (1..detail.totalPkg).toList()
@@ -250,7 +255,8 @@ fun PreviewInwardScreen(
                     })
 
                 SectionTitle(title = "THC:")
-                ItemList(items = thcData,
+                ItemList(
+                    items = thcData,
                     processedNumbers = processedNumbers,
                     missingStatusMap = missingStatusMap,
                     scannedItems = scannedItems,
@@ -297,7 +303,8 @@ fun PreviewInwardScreen(
                                 )
                                 showArrivalConfirmation = true
                             } else {
-                                navigateToFinalCalculation("THC",
+                                navigateToFinalCalculation(
+                                    "THC",
                                     URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
                                     username,
                                     depot,
@@ -369,7 +376,8 @@ fun PreviewInwardScreen(
                         }
 
                         if (excessLRInfoList.isNotEmpty()) {
-                            sendExcessLRData(excessLRInfoList = excessLRInfoList,
+                            sendExcessLRData(
+                                excessLRInfoList = excessLRInfoList,
                                 username = username,
                                 depot = depot,
                                 excessLrType = computedExcessLrType,
@@ -386,7 +394,8 @@ fun PreviewInwardScreen(
                 }
 
                 if (errorMessage != null) {
-                    AlertDialog(onDismissRequest = { errorMessage = null },
+                    AlertDialog(
+                        onDismissRequest = { errorMessage = null },
                         title = { Text("Error") },
                         text = { Text(errorMessage ?: "") },
                         confirmButton = {
@@ -397,13 +406,15 @@ fun PreviewInwardScreen(
                 }
 
                 if (showModal) {
-                    LRModal(lrnos = modalContent,
+                    LRModal(
+                        lrnos = modalContent,
                         scannedItems = scannedItems,
                         onDismiss = { showModal = false })
                 }
 
                 if (showMissingModal) {
-                    MissingLRModal(title = missingModalTitle,
+                    MissingLRModal(
+                        title = missingModalTitle,
                         missingDetails = missingModalContent,
                         onDismiss = { showMissingModal = false })
                 }
@@ -549,15 +560,19 @@ fun ItemList(
     ) {
         items(items) { (number, lrnos) ->
             val isProcessed = processedNumbers.contains(number)
-            val hasMissing = missingStatusMap[number] ?: lrnos.any { lrno ->
+            val hasMissing = (missingStatusMap[number] == true) || lrnos.any { lrno ->
                 val scanned = scannedItems.find { it.first == lrno }
-                if (scanned != null) {
-                    val totalPkgs = scanned.second.first
-                    scanned.second.second.size < totalPkgs
-                } else {
-                    true
-                }
+                scanned == null || (scanned.second.second.size < scanned.second.first)
             }
+//            val hasMissing = missingStatusMap[number] ?: lrnos.any { lrno ->
+//                val scanned = scannedItems.find { it.first == lrno }
+//                if (scanned != null) {
+//                    val totalPkgs = scanned.second.first
+//                    scanned.second.second.size < totalPkgs
+//                } else {
+//                    true
+//                }
+//            }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

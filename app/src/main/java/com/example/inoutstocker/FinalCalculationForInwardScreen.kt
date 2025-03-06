@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,6 +86,8 @@ fun FinalCalculationForInwardScreen(
     val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val showSuccessDialog = remember { mutableStateOf(false) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     // Calculate TotalBagQty and TotalBoxQty from scannedItems
     LaunchedEffect(scannedItems) {
@@ -133,7 +136,6 @@ fun FinalCalculationForInwardScreen(
             Log.d("InwardData", "Processed Excess LR: $lr")
         }
     }
-
 
     var hamaliVendorName by remember { mutableStateOf("") }
     var hamaliType by remember { mutableStateOf("REGULAR") }
@@ -201,15 +203,16 @@ fun FinalCalculationForInwardScreen(
         }
     }
 
-
     LaunchedEffect(deductionAmount) {
         finalAmount = totalAmount - (deductionAmount.toIntOrNull() ?: 0)
         Log.d("DeductionChange", "Deduction: $deductionAmount, Final Amount: $finalAmount")
     }
 
-    val isSubmitEnabled = reason.trim().isNotEmpty() && hamaliVendorName.trim()
-        .isNotEmpty() && godownKeeperName.trim()
-        .isNotEmpty() && hamaliVendorName != "No Hamali Vendor"
+    val isSubmitEnabled = reason.trim().isNotEmpty() &&
+            hamaliVendorName.trim().isNotEmpty() &&
+            godownKeeperName.trim().isNotEmpty() &&
+            ((deductionAmount.toIntOrNull() ?: 0) >= 0) &&
+            ((freight.toIntOrNull() ?: 0) >= 0)
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("Final Calculation") })
@@ -251,7 +254,8 @@ fun FinalCalculationForInwardScreen(
             Log.d("FinalCalculationScreen", "Hamali Vendor Name: $hamaliVendorName")
 
             item {
-                DropdownMenuField(label = "Hamali Type",
+                DropdownMenuField(
+                    label = "Hamali Type",
                     options = listOf("REGULAR", "CROSSING"),
                     selectedOption = hamaliType,
                     onOptionSelected = { hamaliType = it })
@@ -272,9 +276,13 @@ fun FinalCalculationForInwardScreen(
             item {
                 TextField(
                     value = deductionAmount,
-                    onValueChange = { deductionAmount = it },
+                    onValueChange = { input ->
+                        // Keep only digits
+                        deductionAmount = input.filter { it.isDigit() }
+                    },
                     label = { Text("Deduction Amount") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = (deductionAmount.toIntOrNull() ?: 0) < 0,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -296,9 +304,13 @@ fun FinalCalculationForInwardScreen(
                 item {
                     TextField(
                         value = freight,
-                        onValueChange = { freight = it },
+                        onValueChange = { input ->
+                            // Keep only digits
+                            freight = input.filter { it.isDigit() }
+                        },
                         label = { Text("Freight") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = (freight.toIntOrNull() ?: 0) < 0,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -328,7 +340,8 @@ fun FinalCalculationForInwardScreen(
                 Log.d("FinalCalculationScreen", "Closing KM: $closingKm")
 
                 item {
-                    DropdownMenuField(label = "Payment Mode",
+                    DropdownMenuField(
+                        label = "Payment Mode",
                         options = listOf("BANK", "CASH"),
                         selectedOption = paymentMode,
                         onOptionSelected = { paymentMode = it })
@@ -383,7 +396,8 @@ fun FinalCalculationForInwardScreen(
                                         val processedItems =
                                             processScannedItems(scannedItems, reason)
 
-                                        submitDataToServer(prnOrThc = prnOrThc,
+                                        submitDataToServer(
+                                            prnOrThc = prnOrThc,
                                             prn = prn,
                                             username = username,
                                             depot = depot,
@@ -411,10 +425,14 @@ fun FinalCalculationForInwardScreen(
                                             },
                                             onFailure = { error ->
                                                 Log.e(
-                                                    "SubmitButton", "Failed to submit data: $error"
+                                                    "SubmitButton",
+                                                    "Failed to submit data: $error"
                                                 )
                                                 isLoading.value = false
-                                            })
+                                                errorMessage = error
+                                                showErrorDialog = true
+                                            }
+                                        )
                                     } catch (e: Exception) {
                                         Log.e("SubmitButton", "Exception: ${e.message}")
                                         isLoading.value = false
@@ -429,10 +447,11 @@ fun FinalCalculationForInwardScreen(
 
                 // Show success dialog if data submission is successful
                 if (showSuccessDialog.value) {
-                    AlertDialog(onDismissRequest = {
-                        showSuccessDialog.value = false
-                        onBack() // Navigate back and remove the card in PreviewInwardScreen
-                    },
+                    AlertDialog(
+                        onDismissRequest = {
+                            showSuccessDialog.value = false
+                            onBack() // Navigate back and remove the card in PreviewInwardScreen
+                        },
                         confirmButton = {
                             TextButton(onClick = {
                                 showSuccessDialog.value = false
@@ -445,6 +464,18 @@ fun FinalCalculationForInwardScreen(
                         text = { Text("Data submitted successfully.") })
                 }
 
+                if (showErrorDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showErrorDialog = false },
+                        title = { Text("Error", color = Color.Red) },
+                        text = { Text(errorMessage, color = Color.Red) },
+                        confirmButton = {
+                            TextButton(onClick = { showErrorDialog = false }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
             }
         }
     })
@@ -694,7 +725,8 @@ fun DropdownMenuField(
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        TextField(value = selectedOption,
+        TextField(
+            value = selectedOption,
             onValueChange = {},
             label = { Text(label) },
             modifier = Modifier.fillMaxWidth(),
@@ -806,17 +838,18 @@ fun submitDataToServer(
         }
 
         override fun onResponse(call: Call, response: Response) {
-            if (response.isSuccessful) {
-                Handler(Looper.getMainLooper()).post {
-                    val responseBody = response.body?.string()
-                    Log.d("OkHttp", "Response: $responseBody")
-                    onSuccess()
-                }
-            } else {
-                Handler(Looper.getMainLooper()).post {
-                    val errorMessage = response.message
-                    Log.e("OkHttp", "Error: $errorMessage")
-                    onFailure("Error: $errorMessage")
+            Handler(Looper.getMainLooper()).post {
+                val responseBody = response.body?.string()
+                Log.d("OkHttp", "Response: $responseBody")
+                try {
+                    val jsonResponse = JSONObject(responseBody ?: "{}")
+                    if (jsonResponse.optString("status") == "error") {
+                        onFailure(jsonResponse.optString("message", "Unknown error"))
+                    } else {
+                        onSuccess()
+                    }
+                } catch (e: Exception) {
+                    onFailure("Error parsing response")
                 }
             }
         }
