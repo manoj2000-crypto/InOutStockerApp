@@ -21,6 +21,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -56,6 +58,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 
@@ -72,16 +75,14 @@ fun FinalCalculationForInwardScreen(
     val decodedPrnOrThc = java.net.URLDecoder.decode(prnOrThc, "UTF-8")
     val decodedPrn = java.net.URLDecoder.decode(prn, "UTF-8")
 
-//    var totalQty by remember { mutableIntStateOf(0) }
-//    var totalWeight by remember { mutableDoubleStateOf(0.0) }
+    var totalAllQtySum by remember { mutableDoubleStateOf(0.0) }
+    var totalAllWeightSum by remember { mutableDoubleStateOf(0.0) }
+
     var totalBoxQty by remember { mutableDoubleStateOf(0.0) }
     var totalBoxWeight by remember { mutableDoubleStateOf(0.0) }
     var totalBagQty by remember { mutableDoubleStateOf(0.0) }
     var totalBagWeight by remember { mutableDoubleStateOf(0.0) }
     var pkgType by remember { mutableStateOf("") }
-
-    var totalAllQtySum by remember { mutableDoubleStateOf(0.0) }
-    var totalAllWeightSum by remember { mutableDoubleStateOf(0.0) }
 
     val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -110,6 +111,7 @@ fun FinalCalculationForInwardScreen(
             "LRNO: ${item.first}, PkgsNo: ${item.second.first}, BoxNos: ${item.second.second}"
         )
     }
+
     //ADDED code here to see the all inward data and after that if it matches the arrival lr with the shared view modal then we have to remove that from the Shred view modal
     val sharedViewModel: SharedViewModel = viewModel()
     // Trigger logging when the composable is first composed
@@ -151,6 +153,16 @@ fun FinalCalculationForInwardScreen(
     var transactionId by remember { mutableStateOf("") }
     var unloadingHamaliReceived by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+    var vendorType by remember { mutableStateOf("ATTACHED") }
+    var vendorName by remember { mutableStateOf("") }
+    var vehicleNo by remember { mutableStateOf("") }
+
+    val coroutineExceptionHandler = CoroutineExceptionHandler { _, exception ->
+        Log.e("CoroutineException", "Unhandled exception: ${exception.message}")
+        isLoading.value = false
+        errorMessage = exception.message ?: "An unexpected error occurred."
+        showErrorDialog = true
+    }
 
     LaunchedEffect(username) {
         godownKeeperName = fetchFullName(username)
@@ -167,8 +179,7 @@ fun FinalCalculationForInwardScreen(
     LaunchedEffect(hamaliVendorName, hamaliType) {
         if (hamaliVendorName.isNotEmpty() && hamaliType.isNotEmpty()) {
             fetchHamaliRates(
-                hamaliVendorName,
-                depot
+                hamaliVendorName, depot
             ) { regular, crossing, regularBag, crossingBag ->
                 var boxAmount = 0.0
                 var bagAmount = 0.0
@@ -208,11 +219,21 @@ fun FinalCalculationForInwardScreen(
         Log.d("DeductionChange", "Deduction: $deductionAmount, Final Amount: $finalAmount")
     }
 
-    val isSubmitEnabled = reason.trim().isNotEmpty() &&
-            hamaliVendorName.trim().isNotEmpty() &&
-            godownKeeperName.trim().isNotEmpty() &&
-            ((deductionAmount.toIntOrNull() ?: 0) >= 0) &&
-            ((freight.toIntOrNull() ?: 0) >= 0)
+    LaunchedEffect(vendorType) {
+        vendorName = ""
+        vehicleNo = ""
+    }
+
+    val isSubmitEnabled = reason.trim().isNotEmpty() && hamaliVendorName.trim()
+        .isNotEmpty() && godownKeeperName.trim().isNotEmpty() && (deductionAmount.toIntOrNull()
+        ?: 0) >= 0 && (freight.toIntOrNull() ?: 0) >= 0 && (if (decodedPrnOrThc == "PRN") {
+        vendorName.trim().isNotEmpty() && vendorType.trim().isNotEmpty() && vehicleNo.trim()
+            .isNotEmpty()
+    } else true)
+
+//    val isSubmitEnabled = reason.trim().isNotEmpty() && hamaliVendorName.trim()
+//        .isNotEmpty() && godownKeeperName.trim().isNotEmpty() && ((deductionAmount.toIntOrNull()
+//        ?: 0) >= 0) && ((freight.toIntOrNull() ?: 0) >= 0)
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("Final Calculation") })
@@ -224,19 +245,6 @@ fun FinalCalculationForInwardScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-//            item {
-//                Text("Total Box Qty: $totalBoxQty")
-//            }
-//            item {
-//                Text("Total Box Weight: $totalBoxWeight")
-//            }
-//            item {
-//                Text("Total Bag Qty: $totalBagQty")
-//            }
-//            item {
-//                Text("Total Bag Weight: $totalBagWeight")
-//            }
-
             item {
                 Text("Total Qty: $totalAllQtySum")
             }
@@ -301,6 +309,79 @@ fun FinalCalculationForInwardScreen(
 
             // Conditional Fields
             if (decodedPrnOrThc == "PRN") {
+                item {
+                    DropdownMenuField(
+                        label = "Vendor Type",
+                        options = listOf("ATTACHED", "OWN"),
+                        selectedOption = vendorType,
+                        onOptionSelected = { vendorType = it })
+                }
+                Log.d("FinalCalculationScreen", "Vendor Type: $vendorType")
+
+                // New Vendor Name dropdown based on vendor type and depot
+                item {
+                    VendorNameDropdown(
+                        vendorType = vendorType,
+                        depot = depot,
+                        selectedVendor = vendorName,
+                        onVendorSelected = { vendorName = it })
+                }
+                Log.d("FinalCalculationScreen", "Vendor Name: $vendorName")
+
+                // New Vehicle No dropdown based on selected vendor name
+                if (vendorType == "ATTACHED") {
+                    item {
+                        // TextField for manual Vehicle Number entry with validation
+                        var vehicleNoInput by remember { mutableStateOf(vehicleNo) }
+                        var vehicleNoError by remember { mutableStateOf("") }
+                        // Regex for a typical Indian vehicle number (e.g., KA01AB1234)
+                        val vehicleRegex = Regex("^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}\$")
+
+                        LaunchedEffect(vendorType) {
+                            Log.d(
+                                "VehicleNoTextField",
+                                "Vendor type changed. Clearing vehicleNoInput."
+                            )
+                            vehicleNoInput = ""
+                        }
+
+                        TextField(
+                            value = vehicleNoInput,
+                            onValueChange = { input ->
+                                // Force uppercase for consistency
+                                vehicleNoInput = input.uppercase()
+                                // Validate input against the regex
+                                if (vehicleRegex.matches(vehicleNoInput)) {
+                                    vehicleNoError = ""
+                                    vehicleNo = vehicleNoInput
+                                } else {
+                                    vehicleNoError = "Invalid Vehicle Number format"
+                                }
+                            },
+                            label = { Text("Vehicle Number") },
+                            isError = vehicleNoError.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                            supportingText = {
+                                if (vehicleNoError.isNotEmpty()) {
+                                    Text(
+                                        text = vehicleNoError,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            })
+                    }
+                } else if (vendorType == "OWN") {
+                    // Dropdown for selecting a Vehicle Number
+                    item {
+                        VehicleNoDropdown(
+                            vendorName = vendorName,
+                            depot = depot,
+                            selectedVehicle = vehicleNo,
+                            onVehicleSelected = { vehicleNo = it })
+                    }
+                }
+                Log.d("FinalCalculationScreen", "vehicle Number: $vehicleNo")
+
                 item {
                     TextField(
                         value = freight,
@@ -388,9 +469,10 @@ fun FinalCalculationForInwardScreen(
                     if (isLoading.value) {
                         LottieAnimationView()
                     } else {
+
                         Button(
                             onClick = {
-                                coroutineScope.launch {
+                                coroutineScope.launch(coroutineExceptionHandler) {
                                     isLoading.value = true
                                     try {
                                         val processedItems =
@@ -412,6 +494,11 @@ fun FinalCalculationForInwardScreen(
                                             paymentMode = if (prnOrThc == "THC") paymentMode else "",
                                             transactionId = if (prnOrThc == "THC") transactionId else "",
                                             reason = reason,
+                                            vendorType = if (prnOrThc == "PRN") vendorType else "",
+                                            vendorName = if (prnOrThc == "PRN") vendorName else "",
+                                            vehicleNo = if (prnOrThc == "PRN") vehicleNo else "",
+                                            freight = if (prnOrThc == "PRN") freight else "",
+                                            godownKeeperName = if (prnOrThc == "PRN") godownKeeperName else "",
                                             onSuccess = {
                                                 // Store the processedItems in the repository when the submission is successful
                                                 ProcessedItemsRepository.addProcessedItems(
@@ -425,17 +512,17 @@ fun FinalCalculationForInwardScreen(
                                             },
                                             onFailure = { error ->
                                                 Log.e(
-                                                    "SubmitButton",
-                                                    "Failed to submit data: $error"
+                                                    "SubmitButton", "Failed to submit data: $error"
                                                 )
                                                 isLoading.value = false
                                                 errorMessage = error
                                                 showErrorDialog = true
-                                            }
-                                        )
+                                            })
                                     } catch (e: Exception) {
                                         Log.e("SubmitButton", "Exception: ${e.message}")
                                         isLoading.value = false
+                                        errorMessage = e.message ?: "An unexpected error occurred."
+                                        showErrorDialog = true
                                     }
                                 }
                             }, modifier = Modifier.fillMaxWidth(), enabled = isSubmitEnabled
@@ -449,9 +536,9 @@ fun FinalCalculationForInwardScreen(
                 if (showSuccessDialog.value) {
                     AlertDialog(
                         onDismissRequest = {
-                            showSuccessDialog.value = false
-                            onBack() // Navigate back and remove the card in PreviewInwardScreen
-                        },
+                        showSuccessDialog.value = false
+                        onBack() // Navigate back and remove the card in PreviewInwardScreen
+                    },
                         confirmButton = {
                             TextButton(onClick = {
                                 showSuccessDialog.value = false
@@ -473,8 +560,7 @@ fun FinalCalculationForInwardScreen(
                             TextButton(onClick = { showErrorDialog = false }) {
                                 Text("OK")
                             }
-                        }
-                    )
+                        })
                 }
             }
         }
@@ -562,8 +648,7 @@ fun fetchWeightsFromServer(
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, onResult: (TotalWeights) -> Unit
 ) {
     Log.i(
-        "fetchWeightsFromServer",
-        "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
+        "fetchWeightsFromServer", "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
     )
     val client = OkHttpClient()
 
@@ -608,8 +693,7 @@ fun fetchWeightsFromServer(
 
         override fun onResponse(call: Call, response: Response) {
             Log.i(
-                "fetchWeightsFromServer",
-                "onResponse triggered with status code: ${response.code}"
+                "fetchWeightsFromServer", "onResponse triggered with status code: ${response.code}"
             )
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -629,11 +713,7 @@ fun fetchWeightsFromServer(
                 )
                 onResult(
                     TotalWeights(
-                        totalBoxQty,
-                        totalBoxWeight,
-                        totalBagQty,
-                        totalBagWeight,
-                        pkgType
+                        totalBoxQty, totalBoxWeight, totalBagQty, totalBagWeight, pkgType
                     )
                 )
             } else {
@@ -719,6 +799,165 @@ fun HamaliVendorDropdown(
 }
 
 @Composable
+fun VendorNameDropdown(
+    vendorType: String, depot: String, selectedVendor: String, onVendorSelected: (String) -> Unit
+) {
+    var vendorOptions by remember { mutableStateOf(listOf<String>()) }
+    var isLoading by remember { mutableStateOf(false) }
+    val url =
+        "https://vtc3pl.com/fetch_vendor_data_inoutstocker_app.php" // Update with your endpoint URL
+
+    // Define a coroutine exception handler for this composable
+    val coroutineExceptionHandler = remember {
+        CoroutineExceptionHandler { _, exception ->
+            Log.e("VendorNameDropdown", "Unhandled exception: ${exception.message}")
+            isLoading = false
+        }
+    }
+
+    // Suspend function to fetch vendor names
+    suspend fun fetchVendorNames() {
+        isLoading = true
+        try {
+            Log.d(
+                "VendorNameDropdown",
+                "Fetching vendor names with vendortype: $vendorType and depot: $depot"
+            )
+            val formBody =
+                FormBody.Builder().add("vendortype", vendorType).add("depot", depot).build()
+            val request = Request.Builder().url(url).post(formBody).build()
+            val client = OkHttpClient()
+            val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
+            if (response.isSuccessful) {
+                response.body?.string()?.let { responseString ->
+                    val jsonArray = JSONArray(responseString)
+                    val names = mutableListOf<String>()
+                    for (i in 0 until jsonArray.length()) {
+                        val jsonObject = jsonArray.getJSONObject(i)
+                        val vendorName = if (jsonObject.has("vendorCode")) {
+                            jsonObject.getString("vendorCode") + "-" + jsonObject.getString("vendorName")
+                        } else {
+                            jsonObject.getString("vendorName")
+                        }
+                        names.add(vendorName)
+                    }
+                    vendorOptions = names
+                }
+            } else {
+                Log.e("VendorNameDropdown", "Response not successful: ${response.code}")
+            }
+        } catch (e: Exception) {
+            Log.e("VendorNameDropdown", "Error fetching vendor names: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(vendorType, depot) {
+        if (vendorType.isNotEmpty() && depot.isNotEmpty()) {
+            launch(coroutineExceptionHandler) {
+                fetchVendorNames()
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        DropdownMenuField(
+            label = "Vendor Name",
+            options = vendorOptions,
+            selectedOption = selectedVendor,
+            onOptionSelected = { selected ->
+                // Extract only the vendorName after the "-" (if present)
+                val vendorOnly = selected.substringAfter("-", selected).trim()
+                onVendorSelected(vendorOnly)
+            })
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxWidth(0.1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun VehicleNoDropdown(
+    vendorName: String, depot: String, selectedVehicle: String, onVehicleSelected: (String) -> Unit
+) {
+    var vehicleOptions by remember { mutableStateOf(listOf<String>()) }
+    var isLoading by remember { mutableStateOf(false) }
+    val url =
+        "https://vtc3pl.com/fetch_vendor_data_inoutstocker_app.php" // Update with your endpoint URL
+
+    val coroutineExceptionHandler = remember {
+        CoroutineExceptionHandler { _, exception ->
+            Log.e("VehicleNoDropdown", "Unhandled exception: ${exception.message}")
+            isLoading = false
+        }
+    }
+
+    // Suspend function to fetch vehicle numbers
+    suspend fun fetchVehicleNumbers() {
+        isLoading = true
+        try {
+            Log.d("VehicleNoDropdown", "Fetching vehicle numbers for vendor: $vendorName")
+            val formBody =
+                FormBody.Builder().add("vendorname", vendorName).add("depot", depot).build()
+            val request = Request.Builder().url(url).post(formBody).build()
+            val client = OkHttpClient()
+            val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
+            if (response.isSuccessful) {
+                val responseString = response.body?.string() ?: ""
+                Log.d("VehicleNoDropdown", "Response received: $responseString")
+                try {
+                    val jsonArray = JSONArray(responseString)
+                    val vehicles = mutableListOf<String>()
+                    for (i in 0 until jsonArray.length()) {
+                        vehicles.add(jsonArray.getString(i))
+                    }
+                    vehicleOptions = vehicles
+                    Log.d("VehicleNoDropdown", "Fetched vehicle options: $vehicleOptions")
+                } catch (e: JSONException) {
+                    Log.e("VehicleNoDropdown", "JSONException: ${e.message}")
+                    vehicleOptions = emptyList()
+                }
+            } else {
+                Log.e("VehicleNoDropdown", "Response not successful: ${response.code}")
+            }
+        } catch (e: Exception) {
+            Log.e("VehicleNoDropdown", "Error fetching vehicle numbers: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(vendorName) {
+        if (vendorName.isNotEmpty()) {
+            launch(coroutineExceptionHandler) {
+                fetchVehicleNumbers()
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        DropdownMenuField(
+            label = "Vehicle No",
+            options = vehicleOptions,
+            selectedOption = selectedVehicle,
+            onOptionSelected = onVehicleSelected
+        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxWidth(0.1f)
+            )
+        }
+    }
+}
+
+@Composable
 fun DropdownMenuField(
     label: String, options: List<String>, selectedOption: String, onOptionSelected: (String) -> Unit
 ) {
@@ -797,6 +1036,12 @@ fun submitDataToServer(
     paymentMode: String,
     transactionId: String,
     reason: String,
+    // NEW parameters for PRN only:
+    vendorType: String,
+    vendorName: String,
+    vehicleNo: String,
+    freight: String,
+    godownKeeperName: String,
     onSuccess: () -> Unit,
     onFailure: (String) -> Unit
 ) {
@@ -822,6 +1067,13 @@ fun submitDataToServer(
         put("paymentMode", paymentMode)
         put("transactionId", transactionId)
         put("reason", reason)
+        if (prnOrThc == "PRN") {
+            put("vendorType", vendorType)
+            put("vendorName", vendorName)
+            put("vehicleNo", vehicleNo)
+            put("freight", freight.toIntOrNull() ?: 0)
+            put("godownKeeperName", godownKeeperName)
+        }
     }
 
     val body = jsonObject.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -848,7 +1100,7 @@ fun submitDataToServer(
                     } else {
                         onSuccess()
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     onFailure("Error parsing response")
                 }
             }
