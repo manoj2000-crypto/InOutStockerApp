@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, callerContext: String) {
     val scannedData = remember { mutableStateOf("") }
-    val isLoading = remember { mutableStateOf(false) }
+//    val isLoading = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -80,23 +80,23 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                 .requiredHeight(220.dp)
                 .padding(bottom = 8.dp)
         ) {
-            if (isLoading.value) {
-                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.simple_loading_animation))
-                LottieAnimation(
-                    composition, modifier = Modifier
-                        .size(350.dp)
-                        .align(Alignment.Center)
-                )
-            } else {
+//            if (isLoading.value) {
+//                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.simple_loading_animation))
+//                LottieAnimation(
+//                    composition, modifier = Modifier
+//                        .size(350.dp)
+//                        .align(Alignment.Center)
+//                )
+//            } else {
                 BarcodeScanner(
                     modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
                         coroutineScope.launch {
-                            isLoading.value = true
+//                            isLoading.value = true
                             // Play beep sound using SoundPool
                             soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
 
-                            delay(1500) // Pause scanner for 1.5 seconds
-                            isLoading.value = false
+//                            delay(100) // Pause scanner for 100 milliseconds (0.1) seconds for much faster scanning.
+//                            isLoading.value = false
 
                             val parsedData = parseScannedData(data)
                             parsedData?.let { (lrno, pkgsNo, boxNo) ->
@@ -107,7 +107,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                         }
                     }, callerContext = callerContext, sharedViewModel = sharedViewModel
                 )
-            }
+//            }
         }
 
         // Spacer to create space between the barcode scanner and the table header
