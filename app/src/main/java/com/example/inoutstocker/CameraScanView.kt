@@ -88,25 +88,25 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
 //                        .align(Alignment.Center)
 //                )
 //            } else {
-                BarcodeScanner(
-                    modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
-                        coroutineScope.launch {
+            BarcodeScanner(
+                modifier = Modifier.fillMaxSize(), onBarcodeScanned = { data ->
+                    coroutineScope.launch {
 //                            isLoading.value = true
-                            // Play beep sound using SoundPool
-                            soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
+                        // Play beep sound using SoundPool
+                        soundPool.play(beepSoundId, 0.3f, 0.3f, 1, 0, 1f)
 
 //                            delay(100) // Pause scanner for 100 milliseconds (0.1) seconds for much faster scanning.
 //                            isLoading.value = false
 
-                            val parsedData = parseScannedData(data)
-                            parsedData?.let { (lrno, pkgsNo, boxNo) ->
-                                sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
-                                scannedData.value = data
-                                Log.d("CameraScanView", "Scanned Data: $data")
-                            }
+                        val parsedData = parseScannedData(data)
+                        parsedData?.let { (lrno, pkgsNo, boxNo) ->
+                            sharedViewModel.addScannedItem(lrno, pkgsNo, boxNo)
+                            scannedData.value = data
+                            Log.d("CameraScanView", "Scanned Data: $data")
                         }
-                    }, callerContext = callerContext, sharedViewModel = sharedViewModel
-                )
+                    }
+                }, callerContext = callerContext, sharedViewModel = sharedViewModel
+            )
 //            }
         }
 
@@ -155,6 +155,16 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                             color = Color.LightGray
                         )
                 )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(8.dp)
+                        .placeholder(
+                            visible = true,
+                            highlight = PlaceholderHighlight.shimmer(),
+                            color = Color.LightGray
+                        )
+                )
             }
 
             // --- Skeleton Tabular Data & Preview Button ---
@@ -163,7 +173,7 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp)
             ) {
-                // Show a fixed number of skeleton rows (e.g., 3)
+                // Show a fixed number of skeleton rows (e.g., 1)
                 items(1) {
                     Card(
                         modifier = Modifier
@@ -193,6 +203,16 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                             Box(
                                 modifier = Modifier
                                     .weight(0.7f)
+                                    .padding(8.dp)
+                                    .placeholder(
+                                        visible = true,
+                                        highlight = PlaceholderHighlight.shimmer(),
+                                        color = Color.Gray
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
                                     .padding(8.dp)
                                     .placeholder(
                                         visible = true,
@@ -258,12 +278,20 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                     "PkgNo",
                     modifier = Modifier
                         .weight(0.7f)
-                        .padding(8.dp),
+                        .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 8.dp),
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
                 Text(
                     "ItemNo",
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(8.dp),
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "MissNo",
                     modifier = Modifier
                         .weight(1f)
                         .padding(8.dp),
@@ -281,6 +309,13 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                 items(sharedViewModel.scannedItems) { (lrno, pair) ->
                     val (totalPkgs, boxes) = pair
                     val isComplete = boxes.size == totalPkgs
+
+                    // Compute values based on whether scanning is complete
+                    val displayScanned = if (isComplete) "OK" else boxes.joinToString(", ")
+                    val boxesStr = boxes.map { it.toString() }
+                    val missing = (1..totalPkgs).filter { it.toString() !in boxesStr }
+                    val displayMissing = if (isComplete) "-" else missing.joinToString(", ")
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -303,24 +338,32 @@ fun CameraScanView(sharedViewModel: SharedViewModel, onPreview: () -> Unit, call
                                     .padding(8.dp),
                                 textAlign = TextAlign.Start,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                softWrap = false,
+                                overflow = TextOverflow.Visible
                             )
                             Text(
                                 "$totalPkgs",
                                 modifier = Modifier
                                     .weight(0.7f)
-                                    .padding(8.dp),
+                                    .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 8.dp),
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                boxes.joinToString(", "),
+                                displayScanned,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(8.dp),
                                 textAlign = TextAlign.Center,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                displayMissing,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(8.dp),
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
