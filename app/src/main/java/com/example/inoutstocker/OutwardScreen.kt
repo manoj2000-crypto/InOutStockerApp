@@ -56,10 +56,7 @@ import java.util.Calendar
 
 @Composable
 fun OutwardScreen(
-    navController: NavController,
-    username: String,
-    depot: String,
-    sharedViewModel: SharedViewModel
+    navController: NavController, username: String, depot: String, sharedViewModel: SharedViewModel
 ) {
     val scannedData = remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
@@ -103,7 +100,8 @@ fun OutwardScreen(
             )
 
             // Input fields for From Date, To Date
-            OutlinedTextField(value = fromDate,
+            OutlinedTextField(
+                value = fromDate,
                 onValueChange = {},
                 label = { Text("From Date") },
                 modifier = Modifier.fillMaxWidth(),
@@ -116,7 +114,8 @@ fun OutwardScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(value = toDate,
+            OutlinedTextField(
+                value = toDate,
                 onValueChange = {},
                 label = { Text("To Date") },
                 modifier = Modifier.fillMaxWidth(),
@@ -153,7 +152,8 @@ fun OutwardScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Input field for Loading sheet Number
-            OutlinedTextField(value = number,
+            OutlinedTextField(
+                value = number,
                 onValueChange = { number = it },
                 label = { Text("Loading Sheet Number") },
                 modifier = Modifier.fillMaxWidth(),
@@ -178,10 +178,14 @@ fun OutwardScreen(
                         val result = fetchData(number, fromDate, toDate, username, depot)
                         isLoading = false
                         result.onSuccess { data ->
-                            tableData = data
-                            sharedViewModel.updateTableData(data) // Save fetched data
-                            sharedViewModel.setDates(fromDate, toDate) // Save dates
-                            showTable = true
+                            if (data.isEmpty()) {
+                                errorMessage = "Nothing found !!! Please select another date range."
+                            } else {
+                                tableData = data
+                                sharedViewModel.updateTableData(data)
+                                sharedViewModel.setDates(fromDate, toDate)
+                                showTable = true
+                            }
                         }.onFailure { error ->
                             errorMessage = error.message
                         }
