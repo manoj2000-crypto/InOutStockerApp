@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import okhttp3.FormBody
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SourceLockedOrientationActivity")
@@ -52,6 +53,7 @@ fun PreviewInwardScreen(
     var isLoading by remember { mutableStateOf(true) }
     val prnData = remember { mutableStateListOf<Pair<String, List<String>>>() }
     val thcData = remember { mutableStateListOf<Pair<String, List<String>>>() }
+    val drsData = remember { mutableStateListOf<Pair<String, List<String>>>() }
     val excessLrData = remember { mutableStateListOf<String>() }
 
     var showModal by remember { mutableStateOf(false) }
@@ -74,9 +76,12 @@ fun PreviewInwardScreen(
 
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
-            val (prnResults, thcResults, excessLrs) = fetchInwardData(scannedItems, username, depot)
+            val (prnResults, thcResults, drsResults, excessLrs) = fetchInwardData(
+                scannedItems, username, depot
+            )
             prnData.addAll(prnResults)
             thcData.addAll(thcResults)
+            drsData.addAll(drsResults)
             excessLrData.addAll(excessLrs)
 
             isLoading = false
@@ -341,6 +346,36 @@ fun PreviewInwardScreen(
                         }
                     })
 
+                // Add this after the THC section and before the Excess LR section.
+                SectionTitle(title = "DRS:")
+                ItemList(
+                    items = drsData,
+                    processedNumbers = processedNumbers,
+                    missingStatusMap = missingStatusMap,
+                    scannedItems = scannedItems,
+                    onArrivalClick = { token, lrnos ->
+                        coroutineScope.launch {
+                            Log.i("DRS: ", "DRS ARRIVAL BUTTON IS CLICKED.")
+                            // WE HAVE TO CREATE A NEW PAGE FOR THIS BECAUSE FOR THIS USER WILL ONLY SELECT THE OPTIONS AND ENTER THE REASON
+                            //AND SUBMIT THE LR WISE BUTTON SO THAT LR WILL BE IN 'DETENTION'.
+                            // TAKE REFERENCE FORM THESE FILE : detention.php
+//                            navigateToFinalCalculation(
+//                                "DRS",
+//                                URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
+//                                username,
+//                                depot,
+//                                scannedItems.filter { it.first in lrnos })
+                            processedNumbers.add(token)
+                        }
+                    },
+                    onShowClick = { lrnos ->
+                        modalContent = lrnos
+                        showModal = true
+                    },
+                    onMissingLRClick = { token, lrnos ->
+                        // Optionally, add missing LR handling for DRS if applicable.
+                    })
+
                 SectionTitle(title = "Excess LR:")
                 ExcessLRList(excessLrData = filteredExcessLrData)
 
@@ -467,14 +502,13 @@ fun PreviewInwardScreen(
 
 suspend fun fetchInwardData(
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, username: String, depot: String
-): Triple<List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<String>> {
-    val client = OkHttpClient()
-    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
+): InwardDataResult {
+//    val client = OkHttpClient()
+    val client = OkHttpClient.Builder().connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS).writeTimeout(60, TimeUnit.SECONDS).build()
+    // val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
+    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_DRS_app.php"
 
-//    val jsonArray = JSONArray()
-//    scannedItems.forEach { (lrno, _) ->
-//        jsonArray.put(lrno)
-//    }
     val jsonObject = JSONObject().apply {
         put("username", username)
         put("depot", depot)
@@ -519,20 +553,113 @@ suspend fun fetchInwardData(
                         }
                     }
 
+                    // FOR DRS
+                    val drsResults = jsonResponse.getJSONArray("drs").let { drsArray ->
+                        (0 until drsArray.length()).map {
+                            val drsObject = drsArray.getJSONObject(it)
+                            drsObject.getString("drsNumber") to drsObject.getJSONArray("lrnos")
+                                .let { lrnoArray ->
+                                    (0 until lrnoArray.length()).map { idx ->
+                                        lrnoArray.getString(idx)
+                                    }
+                                }
+                        }
+                    }
+
                     val excessLrs = jsonResponse.getJSONArray("excess").let { excessArray ->
                         (0 until excessArray.length()).map { excessArray.getString(it) }
                     }
 
-                    Triple(prnResults, thcResults, excessLrs)
+                    InwardDataResult(prnResults, thcResults, drsResults, excessLrs)
                 } else {
-                    Triple(emptyList(), emptyList(), emptyList())
+                    InwardDataResult(emptyList(), emptyList(), emptyList(), emptyList())
                 }
             }
         } catch (e: Exception) {
-            Triple(emptyList(), emptyList(), emptyList())
+            Log.e("fetchInwardData", "Error fetching inward data: ${e.message}")
+            InwardDataResult(emptyList(), emptyList(), emptyList(), emptyList())
         }
     }
 }
+
+//suspend fun fetchInwardData(
+//    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, username: String, depot: String
+//): Triple<List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<String>> {
+//    val client = OkHttpClient()
+////    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
+//    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_DRS_app.php"
+//
+//    val jsonObject = JSONObject().apply {
+//        put("username", username)
+//        put("depot", depot)
+//        val lrnosArray = JSONArray()
+//        scannedItems.forEach { (lrno, _) ->
+//            lrnosArray.put(lrno)
+//        }
+//        put("lrnos", lrnosArray)
+//    }
+//
+//    val requestBody = jsonObject.toString().toRequestBody("application/json".toMediaTypeOrNull())
+//    val request = Request.Builder().url(url).post(requestBody).build()
+//
+//    return withContext(Dispatchers.IO) {
+//        try {
+//            client.newCall(request).execute().use { response ->
+//                if (response.isSuccessful) {
+//                    val responseBody = response.body?.string() ?: ""
+//                    val jsonResponse = JSONObject(responseBody)
+//
+//                    val prnResults = jsonResponse.getJSONArray("prn").let { prnArray ->
+//                        (0 until prnArray.length()).map {
+//                            val prnObject = prnArray.getJSONObject(it)
+//                            prnObject.getString("prnNumber") to prnObject.getJSONArray("lrnos")
+//                                .let { lrnoArray ->
+//                                    (0 until lrnoArray.length()).map { idx ->
+//                                        lrnoArray.getString(idx)
+//                                    }
+//                                }
+//                        }
+//                    }
+//
+//                    val thcResults = jsonResponse.getJSONArray("thc").let { thcArray ->
+//                        (0 until thcArray.length()).map {
+//                            val thcObject = thcArray.getJSONObject(it)
+//                            thcObject.getString("thcNumber") to thcObject.getJSONArray("lrnos")
+//                                .let { lrnoArray ->
+//                                    (0 until lrnoArray.length()).map { idx ->
+//                                        lrnoArray.getString(idx)
+//                                    }
+//                                }
+//                        }
+//                    }
+//
+//                    //FOR DRS
+//                    val drsResults = jsonResponse.getJSONArray("drs").let { drsArray ->
+//                        (0 until drsArray.length()).map {
+//                            val drsObject = drsArray.getJSONObject(it)
+//                            drsObject.getString("drsNumber") to drsObject.getJSONArray("lrnos")
+//                                .let { lrnoArray ->
+//                                    (0 until lrnoArray.length()).map { idx ->
+//                                        lrnoArray.getString(idx)
+//                                    }
+//                                }
+//                        }
+//                    }
+//
+//                    val excessLrs = jsonResponse.getJSONArray("excess").let { excessArray ->
+//                        (0 until excessArray.length()).map { excessArray.getString(it) }
+//                    }
+//
+//                    Triple(prnResults, thcResults, drsResults, excessLrs)
+//                } else {
+//                    Triple(emptyList(), emptyList(), emptyList(), emptyList())
+//                }
+//            }
+//        } catch (e: Exception) {
+//            Triple(emptyList(), emptyList(), emptyList(), emptyList())
+//        }
+//    }
+//}
 
 @Composable
 fun SectionTitle(title: String) {
@@ -564,15 +691,6 @@ fun ItemList(
                 val scanned = scannedItems.find { it.first == lrno }
                 scanned == null || (scanned.second.second.size < scanned.second.first)
             }
-//            val hasMissing = missingStatusMap[number] ?: lrnos.any { lrno ->
-//                val scanned = scannedItems.find { it.first == lrno }
-//                if (scanned != null) {
-//                    val totalPkgs = scanned.second.first
-//                    scanned.second.second.size < totalPkgs
-//                } else {
-//                    true
-//                }
-//            }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -611,6 +729,7 @@ suspend fun fetchLRDetailsForToken(token: String, type: String): List<LRDetails>
     val url = when (type) {
         "PRN" -> "https://vtc3pl.com/fetch_lr_details_for_prn_inoutstockerapp.php"
         "THC" -> "https://vtc3pl.com/fetch_lr_details_for_thc_inoutstockerapp.php"
+        "DRS" -> "https://vtc3pl.com/fetch_lr_details_for_drs_inoutstockerapp.php"
         else -> return emptyList()
     }
 
@@ -638,6 +757,7 @@ suspend fun fetchLRDetailsForToken(token: String, type: String): List<LRDetails>
                 }
             }
         } catch (e: Exception) {
+            Log.e("fetchLRDetailsForToken", "Error fetching LR details: ${e.message}")
             emptyList()
         }
     }
@@ -814,4 +934,11 @@ data class ArrivalData(
 
 data class LRDetails(
     val lrno: String, val totalPkg: Int
+)
+
+data class InwardDataResult(
+    val prnResults: List<Pair<String, List<String>>>,
+    val thcResults: List<Pair<String, List<String>>>,
+    val drsResults: List<Pair<String, List<String>>>,
+    val excessLrs: List<String>
 )
