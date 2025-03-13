@@ -41,7 +41,8 @@ fun PreviewInwardScreen(
     username: String,
     depot: String,
     onBack: () -> Unit,
-    navigateToFinalCalculation: (String, String, String, String, List<Pair<String, Pair<Int, List<Int>>>>) -> Unit
+    navigateToFinalCalculation: (String, String, String, String, List<Pair<String, Pair<Int, List<Int>>>>) -> Unit,
+    navigateToDRSPage: (String, String, String, String, List<Pair<String, Pair<Int, List<Int>>>>) -> Unit
 ) {
     Log.d("PreviewInwardScreen", "Scanned Items: $scannedItems")
 
@@ -353,18 +354,18 @@ fun PreviewInwardScreen(
                     processedNumbers = processedNumbers,
                     missingStatusMap = missingStatusMap,
                     scannedItems = scannedItems,
+                    hideExtraButtons = true,
                     onArrivalClick = { token, lrnos ->
                         coroutineScope.launch {
                             Log.i("DRS: ", "DRS ARRIVAL BUTTON IS CLICKED.")
-                            // WE HAVE TO CREATE A NEW PAGE FOR THIS BECAUSE FOR THIS USER WILL ONLY SELECT THE OPTIONS AND ENTER THE REASON
-                            //AND SUBMIT THE LR WISE BUTTON SO THAT LR WILL BE IN 'DETENTION'.
-                            // TAKE REFERENCE FORM THESE FILE : detention.php
-//                            navigateToFinalCalculation(
-//                                "DRS",
-//                                URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
-//                                username,
-//                                depot,
-//                                scannedItems.filter { it.first in lrnos })
+                            // Navigate to the DRS page (replace with your actual navigation function)
+                            navigateToDRSPage(
+                                "DRS",
+                                URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
+                                username,
+                                depot,
+                                scannedItems.filter { it.first in lrnos }
+                            )
                             processedNumbers.add(token)
                         }
                     },
@@ -676,6 +677,7 @@ fun ItemList(
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>,
     processedNumbers: List<String>,
     missingStatusMap: Map<String, Boolean>,
+    hideExtraButtons: Boolean = false,
     onArrivalClick: (number: String, lrnos: List<String>) -> Unit,
     onShowClick: (List<String>) -> Unit,
     onMissingLRClick: (token: String, lrnos: List<String>) -> Unit
@@ -702,16 +704,18 @@ fun ItemList(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Button(
-                            onClick = { onMissingLRClick(number, lrnos) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (hasMissing) Color.Red else MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Text("Miss")
-                        }
-                        Button(onClick = { onShowClick(lrnos) }) {
-                            Text("Show")
+                        if (!hideExtraButtons) {
+                            Button(
+                                onClick = { onMissingLRClick(number, lrnos) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (hasMissing) Color.Red else MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text("Miss")
+                            }
+                            Button(onClick = { onShowClick(lrnos) }) {
+                                Text("Show")
+                            }
                         }
                         Button(
                             onClick = { onArrivalClick(number, lrnos) }, enabled = !isProcessed

@@ -21,7 +21,8 @@ fun AppNavigation(
         composable("homeScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
-            HomeScreen(username = username,
+            HomeScreen(
+                username = username,
                 depot = depot,
                 navigateToAuditScreen = { username, depot ->
                     navController.navigate("auditScreen/$username/$depot")
@@ -49,7 +50,8 @@ fun AppNavigation(
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
 
-            PreviewAuditScreen(scannedItems = sharedViewModel.scannedItems,
+            PreviewAuditScreen(
+                scannedItems = sharedViewModel.scannedItems,
                 username = username,
                 depot = depot,
                 onBack = { navController.popBackStack() },
@@ -78,7 +80,8 @@ fun AppNavigation(
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
 
-            PreviewInwardScreen(scannedItems = sharedViewModel.scannedItems,
+            PreviewInwardScreen(
+                scannedItems = sharedViewModel.scannedItems,
                 username = username,
                 depot = depot,
                 onBack = { navController.popBackStack() },
@@ -93,7 +96,34 @@ fun AppNavigation(
                         }, "UTF-8"
                     )
                     navController.navigate("finalCalculationScreen/$prnOrThc/$prn/$username/$depot/$encodedScannedItems")
+                },
+                navigateToDRSPage = { prnOrThc, prn, username, depot, scannedItems ->
+                    val encodedScannedItems = java.net.URLEncoder.encode(
+                        scannedItems.joinToString(";") {
+                            "${it.first},${it.second.first},${it.second.second.joinToString(",")}"
+                        }, "UTF-8"
+                    )
+                    navController.navigate("finalDRSInward/$prnOrThc/$prn/$username/$depot/$encodedScannedItems")
                 })
+        }
+
+        composable("finalDRSInward/{prnOrThc}/{prn}/{username}/{depot}/{scannedItems}") { backStackEntry ->
+            val prnOrThc = backStackEntry.arguments?.getString("prnOrThc") ?: ""
+            val drs = backStackEntry.arguments?.getString("prn") ?: ""
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val scannedItemsEncoded = backStackEntry.arguments?.getString("scannedItems") ?: ""
+            val scannedItems = scannedItemsEncoded.split(";").map { data ->
+                val parts = data.split(",")
+                Pair(parts[0], Pair(parts[1].toInt(), parts.drop(2).map { it.toInt() }))
+            }
+            FinalDRSInward(
+                prnOrThc = prnOrThc,
+                drs = drs,
+                username = username,
+                depot = depot,
+                scannedItems = scannedItems,
+                onBack = { navController.popBackStack() })
         }
 
         //After preview we are calculating the Hamali amount based on the items scanned based on their Qty and Weight.
@@ -109,7 +139,8 @@ fun AppNavigation(
                 Pair(parts[0], Pair(parts[1].toInt(), parts.drop(2).map { it.toInt() }))
             }
 
-            FinalCalculationForInwardScreen(prnOrThc = prnOrThc,
+            FinalCalculationForInwardScreen(
+                prnOrThc = prnOrThc,
                 prn = prn,
                 username = username,
                 depot = depot,
@@ -163,7 +194,8 @@ fun AppNavigation(
             val groupCode =
                 backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
 
-            PreviewOutwardScreen(navController = navController,
+            PreviewOutwardScreen(
+                navController = navController,
                 sharedViewModel = sharedViewModel,
                 username = username,
                 depot = depot,
