@@ -162,7 +162,6 @@ fun PreviewInwardScreen(
         ) {
 
             if (isLoading) {
-                // Show Lottie loading animation while fetching data
                 Box(
                     modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                 ) {
@@ -196,18 +195,6 @@ fun PreviewInwardScreen(
                             missingStatusMap[token] = hasMissingFromFetched
 
                             if (hasMissingFromFetched) {
-                                // Build a new scannedItems list with missing LR(s) “completed”
-//                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
-//                                    val detail = lrDetails.find { it.lrno == lrno }
-//                                    if (detail != null) {
-//                                        Pair(
-//                                            lrno,
-//                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
-//                                        )
-//                                    } else {
-//                                        scannedItems.find { it.first == lrno }
-//                                    }
-//                                }
                                 val modifiedScannedItems = lrnos.mapNotNull { lrno ->
                                     scannedItems.find { it.first == lrno }
                                 }
@@ -286,18 +273,6 @@ fun PreviewInwardScreen(
                             missingStatusMap[token] = hasMissingFromFetched
 
                             if (hasMissingFromFetched) {
-                                // Build a “complete” scanned record for missing LR(s)
-//                                val modifiedScannedItems = lrnos.mapNotNull { lrno ->
-//                                    val detail = lrDetails.find { it.lrno == lrno }
-//                                    if (detail != null) {
-//                                        Pair(
-//                                            lrno,
-//                                            Pair(detail.totalPkg, (1..detail.totalPkg).toList())
-//                                        )
-//                                    } else {
-//                                        scannedItems.find { it.first == lrno }
-//                                    }
-//                                }
                                 val modifiedScannedItems = lrnos.mapNotNull { lrno ->
                                     scannedItems.find { it.first == lrno }
                                 }
@@ -504,7 +479,6 @@ fun PreviewInwardScreen(
 suspend fun fetchInwardData(
     scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, username: String, depot: String
 ): InwardDataResult {
-//    val client = OkHttpClient()
     val client = OkHttpClient.Builder().connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS).writeTimeout(60, TimeUnit.SECONDS).build()
     // val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
@@ -582,85 +556,6 @@ suspend fun fetchInwardData(
         }
     }
 }
-
-//suspend fun fetchInwardData(
-//    scannedItems: List<Pair<String, Pair<Int, List<Int>>>>, username: String, depot: String
-//): Triple<List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<Pair<String, List<String>>>, List<String>> {
-//    val client = OkHttpClient()
-////    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_app.php"
-//    val url = "https://vtc3pl.com/fetch_and_find_inward_data_PRN_THC_DRS_app.php"
-//
-//    val jsonObject = JSONObject().apply {
-//        put("username", username)
-//        put("depot", depot)
-//        val lrnosArray = JSONArray()
-//        scannedItems.forEach { (lrno, _) ->
-//            lrnosArray.put(lrno)
-//        }
-//        put("lrnos", lrnosArray)
-//    }
-//
-//    val requestBody = jsonObject.toString().toRequestBody("application/json".toMediaTypeOrNull())
-//    val request = Request.Builder().url(url).post(requestBody).build()
-//
-//    return withContext(Dispatchers.IO) {
-//        try {
-//            client.newCall(request).execute().use { response ->
-//                if (response.isSuccessful) {
-//                    val responseBody = response.body?.string() ?: ""
-//                    val jsonResponse = JSONObject(responseBody)
-//
-//                    val prnResults = jsonResponse.getJSONArray("prn").let { prnArray ->
-//                        (0 until prnArray.length()).map {
-//                            val prnObject = prnArray.getJSONObject(it)
-//                            prnObject.getString("prnNumber") to prnObject.getJSONArray("lrnos")
-//                                .let { lrnoArray ->
-//                                    (0 until lrnoArray.length()).map { idx ->
-//                                        lrnoArray.getString(idx)
-//                                    }
-//                                }
-//                        }
-//                    }
-//
-//                    val thcResults = jsonResponse.getJSONArray("thc").let { thcArray ->
-//                        (0 until thcArray.length()).map {
-//                            val thcObject = thcArray.getJSONObject(it)
-//                            thcObject.getString("thcNumber") to thcObject.getJSONArray("lrnos")
-//                                .let { lrnoArray ->
-//                                    (0 until lrnoArray.length()).map { idx ->
-//                                        lrnoArray.getString(idx)
-//                                    }
-//                                }
-//                        }
-//                    }
-//
-//                    //FOR DRS
-//                    val drsResults = jsonResponse.getJSONArray("drs").let { drsArray ->
-//                        (0 until drsArray.length()).map {
-//                            val drsObject = drsArray.getJSONObject(it)
-//                            drsObject.getString("drsNumber") to drsObject.getJSONArray("lrnos")
-//                                .let { lrnoArray ->
-//                                    (0 until lrnoArray.length()).map { idx ->
-//                                        lrnoArray.getString(idx)
-//                                    }
-//                                }
-//                        }
-//                    }
-//
-//                    val excessLrs = jsonResponse.getJSONArray("excess").let { excessArray ->
-//                        (0 until excessArray.length()).map { excessArray.getString(it) }
-//                    }
-//
-//                    Triple(prnResults, thcResults, drsResults, excessLrs)
-//                } else {
-//                    Triple(emptyList(), emptyList(), emptyList(), emptyList())
-//                }
-//            }
-//        } catch (e: Exception) {
-//            Triple(emptyList(), emptyList(), emptyList(), emptyList())
-//        }
-//    }
-//}
 
 @Composable
 fun SectionTitle(title: String) {
