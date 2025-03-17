@@ -333,24 +333,21 @@ fun PreviewInwardScreen(
                     onArrivalClick = { token, lrnos ->
                         coroutineScope.launch {
                             Log.i("DRS: ", "DRS ARRIVAL BUTTON IS CLICKED.")
-                            // Navigate to the DRS page (replace with your actual navigation function)
                             navigateToDRSPage(
                                 "DRS",
                                 URLEncoder.encode(token, StandardCharsets.UTF_8.toString()),
                                 username,
                                 depot,
-                                scannedItems.filter { it.first in lrnos }
-                            )
+                                scannedItems.filter { it.first in lrnos })
                             processedNumbers.add(token)
+                            ProcessedItemsRepository.addProcessedItems(lrnos.map { mapOf("LRNO" to it) })
                         }
                     },
                     onShowClick = { lrnos ->
                         modalContent = lrnos
                         showModal = true
                     },
-                    onMissingLRClick = { token, lrnos ->
-                        // Optionally, add missing LR handling for DRS if applicable.
-                    })
+                    onMissingLRClick = { token, lrnos -> })
 
                 SectionTitle(title = "Excess LR:")
                 ExcessLRList(excessLrData = filteredExcessLrData)
