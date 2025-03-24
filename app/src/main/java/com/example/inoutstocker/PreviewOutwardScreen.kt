@@ -30,6 +30,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,6 +81,14 @@ fun PreviewOutwardScreen(
     val drsLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LSD") }
     val thcLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LST") }
 
+    // Compute excessLrType dynamically based on available loading sheets
+    val computedExcessLrType = when {
+        drsLoadingSheets.isNotEmpty() && thcLoadingSheets.isNotEmpty() -> "MANIFEST"
+        drsLoadingSheets.isNotEmpty() -> "DRS"
+        thcLoadingSheets.isNotEmpty() -> "THC"
+        else -> "NONE" // fallback if neither loading sheet type is found
+    }
+
     var categorizedLrnos by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     var excessLrnos by remember { mutableStateOf(emptyList<String>()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -93,6 +102,13 @@ fun PreviewOutwardScreen(
     var totalBoxWeight by remember { mutableStateOf(0.0) }
     var totalBagQty by remember { mutableStateOf(0) }
     var totalBagWeight by remember { mutableStateOf(0.0) }
+
+    // Track excess LR numbers that have already been processed
+    val processedExcessLrnos = remember { mutableStateListOf<String>() }
+
+    var excessStatuses by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var disallowGetData by remember { mutableStateOf(false) }
+
 
     LaunchedEffect(loadingSheetNo) {
         when {
@@ -151,6 +167,59 @@ fun PreviewOutwardScreen(
 
         // Indicate that categorization is complete
         isCategorizing = false
+    }
+
+    // Automatically send Excess LR data when new excess LRs are detected
+    LaunchedEffect(excessLrnos) {
+        // Filter out those already processed
+        val filteredExcessLrnos = excessLrnos.filterNot { it in processedExcessLrnos }
+
+        if (filteredExcessLrnos.isNotEmpty()) {
+            // Build the list of ExcessLRInfo objects using the scanned data from outwardScannedData
+            val excessLRInfoList = filteredExcessLrnos.mapNotNull { lr ->
+                outwardScannedData.find { it.first == lr }?.let { scannedRecord ->
+                    val totalPkg = scannedRecord.second.first
+                    val scannedBoxes = scannedRecord.second.second
+                    val scannedCount = scannedBoxes.size
+                    val totalDiff = totalPkg - scannedCount
+                    val expectedBoxes = (1..totalPkg).toList()
+                    val missingBoxes = expectedBoxes.filter { it !in scannedBoxes }
+                    val missingItemsStr = missingBoxes.joinToString(",").ifEmpty { "" }
+                    ExcessLRInfo(lr, scannedCount, totalDiff, missingItemsStr)
+                }
+            }
+
+            if (excessLRInfoList.isNotEmpty()) {
+                sendExcessLRData(
+                    excessLRInfoList = excessLRInfoList,
+                    username = username,
+                    depot = depot,
+                    excessLrType = computedExcessLrType,
+                    excessFeatureType = "OUTWARD",
+                    onError = { error ->
+                        Log.e("PreviewOutwardScreen", "Error sending excess LR data: $error")
+                    },
+                    onSuccess = {
+                        // Mark these LR numbers as processed
+                        filteredExcessLrnos.forEach { lr ->
+                            processedExcessLrnos.add(lr)
+                            Log.i("PreviewOutwardScreen", "Processed Excess LR: $lr")
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+
+    LaunchedEffect(excessLrnos) {
+        if (excessLrnos.isNotEmpty()) {
+            fetchExcessStatuses(excessLrnos) { statuses ->
+                excessStatuses = statuses
+                // If any LRNO’s status is not in allowed set [0,6,8,9], then disable Get Data
+                disallowGetData = statuses.values.any { it !in listOf(0, 6, 8, 9) }
+            }
+        }
     }
 
     Log.d("PreviewOutwardScreen", "Received Group Code: $groupCode")
@@ -229,41 +298,54 @@ fun PreviewOutwardScreen(
                             color = Color(0xFFFFA500)
                         )
                         excessLrnos.forEach { lrno ->
-                            Text("LRNO: $lrno", color = Color(0xFFFFA500))
+                            // Check the fetched status; if not allowed, display in blue
+                            val status = excessStatuses[lrno] ?: 0
+                            val displayColor =
+                                if (status !in listOf(0, 6, 8, 9)) Color.Blue else Color(0xFFFFA500)
+                            Text("LRNO: $lrno", color = displayColor)
                         }
                     }
                 }
 
                 // Get Data Button and Loader
                 item {
-                    if (isLoading) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            LottieAnimationView()
-                        }
+                    if (disallowGetData) {
+                        Text(
+                            "BLUE COLOR LR PLEASE ARRIVAL THEM FIRST AND THEN START THE PROCESS FOR OUTWARD",
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                     } else {
-                        Button(
-                            onClick = {
-                                isLoading = true
-                                fetchWeightsFromServer(
-                                    categorizedLrnos, excessLrnos, outwardScannedData
-                                ) { boxQty, boxWeight, bagQty, bagWeight, pkgType ->
-                                    totalBoxQty = boxQty
-                                    totalBoxWeight = boxWeight
-                                    totalBagQty = bagQty
-                                    totalBagWeight = bagWeight
 
-                                    totalQtyScanned = totalBoxQty + totalBagQty
-                                    totalWeight = totalBoxWeight + totalBagWeight
-                                    isLoading = false
-                                    isDataFetched = totalQtyScanned > 0 && totalWeight > 0.0
-                                }
-                            }, modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading && !isDataFetched
-                        ) {
-                            Text("Get Data")
+                        if (isLoading) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                LottieAnimationView()
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    isLoading = true
+                                    fetchWeightsFromServer(
+                                        categorizedLrnos, excessLrnos, outwardScannedData
+                                    ) { boxQty, boxWeight, bagQty, bagWeight, pkgType ->
+                                        totalBoxQty = boxQty
+                                        totalBoxWeight = boxWeight
+                                        totalBagQty = bagQty
+                                        totalBagWeight = bagWeight
+
+                                        totalQtyScanned = totalBoxQty + totalBagQty
+                                        totalWeight = totalBoxWeight + totalBagWeight
+                                        isLoading = false
+                                        isDataFetched = totalQtyScanned > 0 && totalWeight > 0.0
+                                    }
+                                }, modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoading && !isDataFetched
+                            ) {
+                                Text("Get Data")
+                            }
                         }
                     }
                 }
@@ -317,6 +399,43 @@ fun PreviewOutwardScreen(
             }
         }
     }
+}
+
+fun fetchExcessStatuses(excessLrnos: List<String>, onResult: (Map<String, Int>) -> Unit) {
+    val client = OkHttpClient()
+    val url = "https://vtc3pl.com/check_excess_status.php"
+    val formBody = FormBody.Builder()
+        .add("excessLRs", excessLrnos.joinToString(","))
+        .build()
+    val request = Request.Builder().url(url).post(formBody).build()
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("fetchExcessStatuses", "Request failed: ${e.message}")
+            onResult(emptyMap())
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string() ?: "{}"
+                try {
+                    val jsonObj = JSONObject(responseBody)
+                    val statuses = mutableMapOf<String, Int>()
+                    val keys = jsonObj.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        statuses[key] = jsonObj.optInt(key, 0)
+                    }
+                    onResult(statuses)
+                } catch (e: Exception) {
+                    Log.e("fetchExcessStatuses", "JSON parsing error: ${e.message}")
+                    onResult(emptyMap())
+                }
+            } else {
+                Log.e("fetchExcessStatuses", "Error: ${response.message}")
+                onResult(emptyMap())
+            }
+        }
+    })
 }
 
 // Function to fetch weight and quantity from the server
