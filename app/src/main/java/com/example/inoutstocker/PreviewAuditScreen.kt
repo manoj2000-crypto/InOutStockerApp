@@ -106,8 +106,7 @@ fun PreviewAuditScreen(
                     .padding(horizontal = 8.dp)
             ) {
                 items(previewData) { (lrno, totalPkgs, missingBoxes) ->
-                    val cardColor =
-                        if (missingBoxes.isEmpty()) Color(GREEN) else Color(RED)
+                    val cardColor = if (missingBoxes.isEmpty()) Color(GREEN) else Color(RED)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -131,72 +130,85 @@ fun PreviewAuditScreen(
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Remark Field
-            TextField(
-                value = remarks.value,
-                onValueChange = { remarks.value = it },
-                label = { Text("Remarks") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            )
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                if (isLoading.value) {
-                    LottieAnimationView()
-                } else {
-                    Button(
-                        onClick = {
-                            if (remarks.value.isBlank()) {
-                                errorMessage.value = "Remark cannot be empty."
-                                return@Button
-                            }
-                            coroutineScope.launch {
-                                isLoading.value = true
-                                try {
-                                    delay(500)
-                                    val response = sendDataToServer(
-                                        previewData,
-                                        remarks.value,
-                                        username,
-                                        depot
-                                    )
-                                    isLoading.value = false
-                                    if (response.first) {
-                                        Log.i("PreviewAuditScreen", "Success: ${response.second}")
-                                        successMessage.value = response.second
-                                        errorMessage.value = null
-                                    } else {
-                                        Log.i("PreviewAuditScreen", "Error: ${response.second}")
-                                        errorMessage.value = response.second
-                                        successMessage.value = null
-                                    }
-                                } catch (e: Exception) {
-                                    isLoading.value = false
-                                    Log.i("PreviewAuditScreen", "Exception: ${e.message}")
-                                    errorMessage.value = "An error occurred: ${e.message}"
-                                    successMessage.value = null
-                                }
-                            }
-                        }, modifier = Modifier
+                item {
+                    // Remark Field
+                    TextField(
+                        value = remarks.value,
+                        onValueChange = { remarks.value = it },
+                        label = { Text("Remarks") },
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text("Save")
+                            .padding(horizontal = 16.dp)
+                    )
+                }
+
+                item {
+                    errorMessage.value?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                 }
-            }
 
-            errorMessage.value?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(16.dp)
-                )
+                item {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        if (isLoading.value) {
+                            LottieAnimationView()
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (remarks.value.isBlank()) {
+                                        errorMessage.value = "Remark cannot be empty."
+                                        return@Button
+                                    }
+                                    coroutineScope.launch {
+                                        isLoading.value = true
+                                        try {
+                                            delay(500)
+                                            val response = sendDataToServer(
+                                                previewData, remarks.value, username, depot
+                                            )
+                                            isLoading.value = false
+                                            if (response.first) {
+                                                Log.i(
+                                                    "PreviewAuditScreen",
+                                                    "Success: ${response.second}"
+                                                )
+                                                successMessage.value = response.second
+                                                errorMessage.value = null
+                                            } else {
+                                                Log.i(
+                                                    "PreviewAuditScreen",
+                                                    "Error: ${response.second}"
+                                                )
+                                                errorMessage.value = response.second
+                                                successMessage.value = null
+                                            }
+                                        } catch (e: Exception) {
+                                            isLoading.value = false
+                                            Log.i("PreviewAuditScreen", "Exception: ${e.message}")
+                                            errorMessage.value = "An error occurred: ${e.message}"
+                                            successMessage.value = null
+                                        }
+                                    }
+                                }, modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Text("Save")
+                            }
+                        }
+                    }
+                }
+
             }
 
             if (successMessage.value != null) {
@@ -247,8 +259,7 @@ suspend fun sendDataToServer(
 
     val jsonString = jsonArray.toString()
     Log.i("sendDataToServer", "Request JSON: $jsonString")
-    val requestBody: RequestBody =
-        jsonString.toRequestBody("application/json".toMediaTypeOrNull())
+    val requestBody: RequestBody = jsonString.toRequestBody("application/json".toMediaTypeOrNull())
 
     val request =
         Request.Builder().url(url).post(requestBody).addHeader("Content-Type", "application/json")
