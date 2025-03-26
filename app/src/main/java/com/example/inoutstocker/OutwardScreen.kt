@@ -179,7 +179,8 @@ fun OutwardScreen(
                         isLoading = false
                         result.onSuccess { data ->
                             if (data.isEmpty()) {
-                                errorMessage = "Nothing found !!! Please select another date range. Or Change the Loading sheet number."
+                                errorMessage =
+                                    "Nothing found !!! Please select another date range. Or Change the Loading sheet number."
                             } else {
                                 tableData = data
                                 sharedViewModel.updateTableData(data)
@@ -269,6 +270,8 @@ fun TableView(
                         LabelWithValue(label = "DRS or THC", value = row.drsOrThc)
                         Spacer(modifier = Modifier.height(4.dp))
                         LabelWithValue(label = "Location", value = row.location)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LabelWithValue(label = "Service Type", value = row.serviceType)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -280,14 +283,30 @@ fun TableView(
                     Box(
                         modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center
                     ) {
-                        Button(onClick = {
-                            val encodedGroupCode = Uri.encode(groupCode)
-                            // Handle Submit button click here
-                            Log.d("TableView", "Submit clicked for Group Code: $groupCode")
-                            navController.navigate("outwardScanScreen/$username/$depot/$loadingSheetNos/$encodedGroupCode") // Navigate to OutwardScanScreen
-                        }) {
-                            Text(text = "Submit")
+
+                        val commonServiceType = rows.firstOrNull()?.serviceType ?: ""
+
+                        if (commonServiceType == "FTL") {
+                            // Show the FTL button only when serviceType is "FTL"
+                            Button(onClick = {
+                                val encodedGroupCode = Uri.encode(groupCode)
+                                Log.d("TableView", "FTL clicked for Group Code: $groupCode")
+                                navController.navigate("ftlScreen/$username/$depot/$loadingSheetNos/$encodedGroupCode")
+                            }) {
+                                Text(text = "FTL")
+                            }
+                        } else {
+
+                            Button(onClick = {
+                                val encodedGroupCode = Uri.encode(groupCode)
+                                Log.d("TableView", "Submit clicked for Group Code: $groupCode")
+                                navController.navigate("outwardScanScreen/$username/$depot/$loadingSheetNos/$encodedGroupCode") // Navigate to OutwardScanScreen
+                            }) {
+                                Text(text = "Submit")
+                            }
+
                         }
+
                     }
                 }
             }
@@ -357,7 +376,8 @@ suspend fun fetchData(
                             driverName = item.getString("drivername"),
                             driverContact = item.getString("driverno"),
                             arrivalDate = item.getString("arrivaldate"),
-                            location = item.getString("location")
+                            location = item.getString("location"),
+                            serviceType = item.getString("serviceType")
                         )
                     }
                     Log.i("fetchData", "Parsed Table Data: $tableData")
@@ -386,5 +406,6 @@ data class TableRowData(
     val driverName: String,
     val driverContact: String,
     val arrivalDate: String,
-    val location: String
+    val location: String,
+    val serviceType: String
 )

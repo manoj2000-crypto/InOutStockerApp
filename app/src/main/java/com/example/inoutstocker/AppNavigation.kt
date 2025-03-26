@@ -204,6 +204,25 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() })
         }
 
+        //If we get the 'service type = FTL' only then we dont need to scan after this page we will direct the user to the last page for final calculation.
+        // New FTL Screen
+        composable("ftlScreen/{username}/{depot}/{loadingSheetNos}/{groupCode}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val loadingSheetNos = backStackEntry.arguments?.getString("loadingSheetNos") ?: ""
+            val groupCode =
+                backStackEntry.arguments?.getString("groupCode")?.let { Uri.decode(it) } ?: ""
+
+            FtlScreen(
+                navController = navController,
+                username = username,
+                depot = depot,
+                loadingSheetNos = loadingSheetNos,
+                groupCode = groupCode,
+                sharedViewModel = sharedViewModel
+            )
+        }
+
         // Outward Final Calculation Screen
         composable("finalCalculationOutwardScreen/{username}/{depot}/{loadingSheetNo}/{totalBoxQty}/{totalBoxWeight}/{totalBagQty}/{totalBagWeight}/{groupCode}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
