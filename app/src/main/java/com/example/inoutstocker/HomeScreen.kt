@@ -45,7 +45,8 @@ fun HomeScreen(
     depot: String,
     navigateToAuditScreen: (String, String) -> Unit,
     navigateToInwardScreen: (String, String) -> Unit,
-    navigateToOutwardScreen: (String, String) -> Unit
+    navigateToOutwardScreen: (String, String) -> Unit,
+    navigateToPRNOutwardScreen: (String, String) -> Unit
 ) {
     InOutStockerTheme {
         val showExitDialog = remember { mutableStateOf(false) }
@@ -87,7 +88,8 @@ fun HomeScreen(
             depot = depot,
             onBoxAuditClick = navigateToAuditScreen,
             onBoxInwardClick = navigateToInwardScreen,
-            onBoxOutwardClick = navigateToOutwardScreen
+            onBoxOutwardClick = navigateToOutwardScreen,
+            onBoxPrnOutwardClick = navigateToPRNOutwardScreen
         )
     }
 }
@@ -99,7 +101,8 @@ fun HomeScreenContent(
     depot: String,
     onBoxAuditClick: (String, String) -> Unit,
     onBoxInwardClick: (String, String) -> Unit,
-    onBoxOutwardClick: (String, String) -> Unit
+    onBoxOutwardClick: (String, String) -> Unit,
+    onBoxPrnOutwardClick: (String, String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -147,8 +150,17 @@ fun HomeScreenContent(
                     }
 
                     Button(
-                        onClick = { onBoxOutwardClick(username, depot) }) {
+                        onClick = { onBoxOutwardClick(username, depot) },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
                         Text(text = "Outward")
+                    }
+
+                    Button(
+                        onClick = { onBoxPrnOutwardClick(username, depot) },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(text = "PRN Outward")
                     }
                 }
             }
@@ -206,8 +218,7 @@ fun DashboardCounts(depot: String) {
                     width = 2.dp,
                     color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(8.dp)
-                ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(text = "Dashboard", style = MaterialTheme.typography.titleMedium)

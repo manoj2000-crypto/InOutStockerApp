@@ -280,6 +280,7 @@ fun BarcodeScanner(
                         "INWARD" -> sharedViewModel.clearInwardScannedItems()
                         "OUTWARD" -> sharedViewModel.clearOutwardScannedItems()
                         "AUDIT" -> sharedViewModel.clearAuditScannedItems()
+                        "PRN_OUTWARD" -> sharedViewModel.clearPrnOutwardScannedItems()
                         else -> {
                             // Fallback in case the callerContext is not recognized
                             sharedViewModel.clearScannedItems()

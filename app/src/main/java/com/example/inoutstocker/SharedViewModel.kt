@@ -11,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 class SharedViewModel : ViewModel() {
-    enum class FeatureType { INWARD, OUTWARD, AUDIT }
+    enum class FeatureType { INWARD, OUTWARD, AUDIT, PRN_OUTWARD }
 
     private val _featureType = mutableStateOf(FeatureType.INWARD)
     val featureType: FeatureType get() = _featureType.value
@@ -19,12 +19,14 @@ class SharedViewModel : ViewModel() {
     private val inwardScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
     private val outwardScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
     private val auditScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    private val prnOutwardScannedItems = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
 
     val scannedItems: List<Pair<String, Pair<Int, List<Int>>>>
         get() = when (_featureType.value) {
             FeatureType.INWARD -> inwardScannedItems
             FeatureType.OUTWARD -> outwardScannedItems
             FeatureType.AUDIT -> auditScannedItems
+            FeatureType.PRN_OUTWARD -> prnOutwardScannedItems
         }
 
     fun setFeatureType(type: FeatureType) {
@@ -36,6 +38,7 @@ class SharedViewModel : ViewModel() {
             FeatureType.INWARD -> inwardScannedItems
             FeatureType.OUTWARD -> outwardScannedItems
             FeatureType.AUDIT -> auditScannedItems
+            FeatureType.PRN_OUTWARD -> prnOutwardScannedItems
         }
 
         val index = targetList.indexOfFirst { it.first == lrno }
@@ -54,6 +57,7 @@ class SharedViewModel : ViewModel() {
             FeatureType.INWARD -> inwardScannedItems.clear()
             FeatureType.OUTWARD -> outwardScannedItems.clear()
             FeatureType.AUDIT -> auditScannedItems.clear()
+            FeatureType.PRN_OUTWARD -> prnOutwardScannedItems.clear()
         }
     }
 
@@ -67,6 +71,10 @@ class SharedViewModel : ViewModel() {
         outwardScannedItems.clear()
     }
 
+    fun clearPrnOutwardScannedItems() {
+        prnOutwardScannedItems.clear()
+    }
+
     fun clearAuditScannedItems() {
         auditScannedItems.clear()
     }
@@ -76,13 +84,26 @@ class SharedViewModel : ViewModel() {
         _outwardScannedData.clear() // Clears only Outward-specific scanned data
     }
 
+    fun clearPrnOutwardData() {
+        prnOutwardScannedItems.clear() // Clears only Outward Scanned Items
+        _prnOutwardScannedData.clear() // Clears only Outward-specific scanned data
+    }
+
     // ---- New Methods for Outward Scanned Data ----
     private val _outwardScannedData = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
     val outwardScannedData: List<Pair<String, Pair<Int, List<Int>>>> get() = _outwardScannedData
 
+    private val _prnOutwardScannedData = mutableStateListOf<Pair<String, Pair<Int, List<Int>>>>()
+    val prnOutwardScannedData: List<Pair<String, Pair<Int, List<Int>>>> get() = _prnOutwardScannedData
+
     fun setOutwardScannedData(data: List<Pair<String, Pair<Int, List<Int>>>>) {
         _outwardScannedData.clear()
         _outwardScannedData.addAll(data)
+    }
+
+    fun setPrnOutwardScannedData(data: List<Pair<String, Pair<Int, List<Int>>>>) {
+        _prnOutwardScannedData.clear()
+        _prnOutwardScannedData.addAll(data)
     }
 
     var fromDate by mutableStateOf(getPreviousDate()) // Default: Previous Date
@@ -116,7 +137,6 @@ class SharedViewModel : ViewModel() {
     fun updateCategorizedLrnos(newMap: Map<String, List<String>>) {
         categorizedLrnos = newMap
     }
-
 
 }
 

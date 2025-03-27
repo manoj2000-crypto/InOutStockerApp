@@ -32,6 +32,9 @@ fun AppNavigation(
                 },
                 navigateToOutwardScreen = { username, depot ->
                     navController.navigate("outwardScreen/$username/$depot")
+                },
+                navigateToPRNOutwardScreen = { username, depot ->
+                    navController.navigate("prnOutwardScreen/$username/$depot")
                 })
         }
 
@@ -249,6 +252,32 @@ fun AppNavigation(
                 sharedViewModel = sharedViewModel,
                 navController = navController
             )
+        }
+
+        composable("prnOutwardScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            sharedViewModel.setFeatureType(SharedViewModel.FeatureType.PRN_OUTWARD)
+            PrnOutwardScreen(username = username, depot = depot, onPreview = {
+                navController.navigate("previewPrnScreen/$username/$depot") // MODIFY HERE USE PRN_PREVIEW_SCREEN
+            }, sharedViewModel = sharedViewModel)
+        }
+
+        composable("previewPrnScreen/{username}/{depot}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+
+            PreviewPrnScreen(
+                scannedItems = sharedViewModel.scannedItems,
+                username = username,
+                depot = depot,
+                onBack = { navController.popBackStack() },
+                onBackToHome = {
+                    sharedViewModel.clearScannedItems()
+//                    navController.navigate("homeScreen/$username/$depot") {
+//                        popUpTo("homeScreen/$username/$depot") { inclusive = true }
+//                    }
+                })
         }
 
     }

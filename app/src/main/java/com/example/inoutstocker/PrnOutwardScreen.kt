@@ -3,7 +3,6 @@ package com.example.inoutstocker
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,7 +28,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SourceLockedOrientationActivity")
 @Composable
-fun AuditScreen(
+fun PrnOutwardScreen(
     username: String, depot: String, onPreview: () -> Unit, sharedViewModel: SharedViewModel
 ) {
     //Stopping user to change the orientation from vertical to portrait
@@ -45,7 +44,7 @@ fun AuditScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "AUDIT SCREEN",
+                        text = "PRN OUTWARD SCREEN",
                         style = MaterialTheme.typography.titleLarge,
                         textAlign = TextAlign.Center
                     )
@@ -73,6 +72,7 @@ fun AuditScreen(
                     ) {
                         Text("Scan Using Mobile Camera")
                     }
+
                     Button(
                         onClick = { scanMode = "bluetooth" },
                         modifier = Modifier
@@ -85,34 +85,21 @@ fun AuditScreen(
             } else {
                 // Show content based on selected scan mode
                 when (scanMode) {
+
                     "camera" -> {
                         CameraScanView(
                             sharedViewModel = sharedViewModel,
                             onPreview = onPreview,
-                            callerContext = "AUDIT"
+                            callerContext = "PRN_OUTWARD"
                         )
                     }
 
                     "bluetooth" -> {
                         ComingSoonView()
                     }
+
                 }
             }
         }
-    }
-}
-
-@Composable
-fun ComingSoonView() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp), contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Coming Soon",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
     }
 }
