@@ -64,6 +64,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,7 +106,8 @@ fun PermissionHandler(content: @Composable () -> Unit) {
 
     when {
         !cameraPermissionState.status.isGranted -> {
-            AlertDialog(onDismissRequest = {},
+            AlertDialog(
+                onDismissRequest = {},
                 title = { Text("Camera Permission Required") },
                 text = { Text("This app requires access to your camera. Please grant the permission.") },
                 confirmButton = {
@@ -121,7 +123,8 @@ fun PermissionHandler(content: @Composable () -> Unit) {
         }
 
         !internetPermissionState.status.isGranted -> {
-            AlertDialog(onDismissRequest = {},
+            AlertDialog(
+                onDismissRequest = {},
                 title = { Text("Internet Permission Required") },
                 text = { Text("This app requires internet access to function properly. Please grant the permission.") },
                 confirmButton = {
@@ -138,7 +141,8 @@ fun PermissionHandler(content: @Composable () -> Unit) {
 
         // Only show the Bluetooth dialog if we're on Android 12+ and the permission isn’t granted
         bluetoothPermissionState != null && !bluetoothPermissionState.status.isGranted -> {
-            AlertDialog(onDismissRequest = {},
+            AlertDialog(
+                onDismissRequest = {},
                 title = { Text("Bluetooth Permission Required") },
                 text = { Text("This app requires access to Bluetooth for scanning device. Please grant the permission.") },
                 confirmButton = {
@@ -168,10 +172,10 @@ fun openAppSettings(context: Context) {
 
 fun saveCredentials(context: Context, username: String, password: String) {
     val sharedPreferences = context.getSharedPreferences("InOutStockerPrefs", Context.MODE_PRIVATE)
-    val editor = sharedPreferences.edit()
-    editor.putString("username", username)
-    editor.putString("password", password)
-    editor.apply()
+    sharedPreferences.edit {
+        putString("username", username)
+        putString("password", password)
+    }
 }
 
 fun getSavedCredentials(context: Context): Pair<String, String> {
@@ -339,7 +343,7 @@ fun loginUser(
     CoroutineScope(Dispatchers.IO).launch {
         val client = OkHttpClient()
         val requestBody = FormBody.Builder().add("user_name", username).add("password", password)
-            .add("appVersion", "versionFive").build()
+            .add("appVersion", "versionFour").build()
 
         val request = Request.Builder().url("https://vtc3pl.com/in_out_stocker_app_login.php")
             .post(requestBody).build()
@@ -361,7 +365,7 @@ fun loginUser(
                     onLoginResponse("error", "Network error, please try again.", "")
                 }
             }
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             withContext(Dispatchers.Main) {
                 loading.value = false
                 onLoginResponse("error", "Network error, please try again.", "")

@@ -254,15 +254,17 @@ fun AppNavigation(
             )
         }
 
+        //PRN Outward Screen IS NEW PART OF THE OUTWARD TO CREATE PRN : TAKE THE C&F GOODS TO OUR DEPOT
         composable("prnOutwardScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.PRN_OUTWARD)
             PrnOutwardScreen(username = username, depot = depot, onPreview = {
-                navController.navigate("previewPrnScreen/$username/$depot") // MODIFY HERE USE PRN_PREVIEW_SCREEN
+                navController.navigate("previewPrnScreen/$username/$depot")
             }, sharedViewModel = sharedViewModel)
         }
 
+        // PREVIEW SCREEN FOR PRN OUTWARD AND WEIGHT CALCULATION AND THEN PROCEED TO FINAL CALCULATION SCREEN FOR PRN OUTWARD
         composable("previewPrnScreen/{username}/{depot}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
@@ -271,13 +273,33 @@ fun AppNavigation(
                 scannedItems = sharedViewModel.scannedItems,
                 username = username,
                 depot = depot,
-                onBack = { navController.popBackStack() },
-                onBackToHome = {
-                    sharedViewModel.clearScannedItems()
-//                    navController.navigate("homeScreen/$username/$depot") {
-//                        popUpTo("homeScreen/$username/$depot") { inclusive = true }
-//                    }
-                })
+                sharedViewModel = sharedViewModel,
+                navController = navController,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        //FINAL CALCULATION FOR PRN OUTWARD ADN THEN GO TO HOME SCREEN
+        composable("finalCalculationForPrnOutwardScreen/{username}/{depot}/{totalBoxQty}/{totalBoxWeight}/{totalBagQty}/{totalBagWeight}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val depot = backStackEntry.arguments?.getString("depot") ?: ""
+            val totalBoxQty = backStackEntry.arguments?.getString("totalBoxQty")?.toIntOrNull() ?: 0
+            val totalBoxWeight = backStackEntry.arguments?.getString("totalBoxWeight")
+                ?.let { Uri.decode(it).toDoubleOrNull() } ?: 0.0
+            val totalBagQty = backStackEntry.arguments?.getString("totalBagQty")?.toIntOrNull() ?: 0
+            val totalBagWeight = backStackEntry.arguments?.getString("totalBagWeight")
+                ?.let { Uri.decode(it).toDoubleOrNull() } ?: 0.0
+
+            FinalCalculationForPrnOutwardScreen(
+                username = username,
+                depot = depot,
+                totalBoxQty = totalBoxQty,
+                totalBoxWeight = totalBoxWeight,
+                totalBagQty = totalBagQty,
+                totalBagWeight = totalBagWeight,
+                sharedViewModel = sharedViewModel,
+                navController = navController
+            )
         }
 
     }
