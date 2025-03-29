@@ -89,6 +89,7 @@ fun FinalCalculationForPrnOutwardScreen(
     var hamaliVendorName by remember { mutableStateOf("") }
     var hamaliType by remember { mutableStateOf("REGULAR") }
     var selectedVehicleCapacity by remember { mutableStateOf("MINI TEMPO UPTO 1 MT") }
+    var selectedGodownNumber by remember { mutableStateOf("LANE 1") }
 
     // State for showing the modal dialog
     var showDialog by remember { mutableStateOf(false) }
@@ -306,6 +307,17 @@ fun FinalCalculationForPrnOutwardScreen(
                     onOptionSelected = { selectedVehicleCapacity = it })
             }
 
+            // Show Godown Number
+            item {
+                DropdownMenuField(
+                    label = "Godown Number",
+                    options = listOf(
+                        "LANE 1", "LANE 2", "LANE 3", "LANE 4", "LANE 5"
+                    ),
+                    selectedOption = selectedGodownNumber,
+                    onOptionSelected = { selectedGodownNumber = it })
+            }
+
             // Display Amounts and Deduction
             item {
                 TextField(
@@ -383,6 +395,7 @@ fun FinalCalculationForPrnOutwardScreen(
                                         vendorType = vendorType,
                                         vendorName = vendorName,
                                         vehicleNo = vehicleNo,
+                                        goDown = selectedGodownNumber,
                                         selectedVehicleCapacity = selectedVehicleCapacity,
                                         navController = navController,
                                         sharedViewModel = sharedViewModel,
@@ -423,10 +436,10 @@ fun FinalCalculationForPrnOutwardScreen(
         }, title = { Text("Generated Number") }, text = {
             Column {
                 Text("PRN Number: $drsThcMapping")
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(thickness = 1.dp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Message: $additionalMessage")
+//                Spacer(modifier = Modifier.height(8.dp))
+//                HorizontalDivider(thickness = 1.dp, color = Color.Gray)
+//                Spacer(modifier = Modifier.height(8.dp))
+//                Text("Message: $additionalMessage")
             }
         }, confirmButton = {
             Button(onClick = {
@@ -496,6 +509,7 @@ fun submitFinalCalculationForPrnOutwardScreen(
     vendorType: String,
     vendorName: String,
     vehicleNo: String,
+    goDown: String,
     selectedVehicleCapacity: String,
     navController: NavController,
     sharedViewModel: SharedViewModel,
@@ -518,6 +532,7 @@ fun submitFinalCalculationForPrnOutwardScreen(
         put("vendorType", vendorType)
         put("vendorName", vendorName)
         put("vehicleNo", vehicleNo)
+        put("goDown", goDown)
         put("selectedVehicleCapacity", selectedVehicleCapacity)
 
         Log.d("FinalCalculation", "Processing outwardScannedData: $outwardScannedData")

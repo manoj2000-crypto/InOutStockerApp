@@ -131,15 +131,13 @@ fun PreviewPrnScreen(
                 if (isLoading) {
                     LottieAnimationView()
                 } else {
-                    Text("Total Box Quantity: $totalBoxQty")
-                    Text("Total Box Weight: $totalBoxWeight")
-                    Text("Total Bag Quantity: $totalBagQty")
-                    Text("Total Bag Weight: $totalBagWeight")
-
                     Text("Total Quantity Scanned: $totalQtyScanned")
                     Text("Total Weight: $totalWeight")
-
-                    Text("Package Type: $pkgType")
+//                    Text("Total Box Quantity: $totalBoxQty")
+//                    Text("Total Box Weight: $totalBoxWeight")
+//                    Text("Total Bag Quantity: $totalBagQty")
+//                    Text("Total Bag Weight: $totalBagWeight")
+//                    Text("Package Type: $pkgType")
                 }
             }
 
