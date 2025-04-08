@@ -236,12 +236,11 @@ fun PreviewInwardScreen(
                                 } else {
                                     (1..detail.totalPkg).joinToString(",")
                                 }
-                                detail.lrno to missing
+                                detail.lrno to "Missing: $missing | ToPlace: ${detail.toPlace}"
                             }.filter { (_, missing) ->
                                 missing != "None"
                             }
-                            missingModalContent =
-                                details.map { (lrno, missing) -> "$lrno: $missing" }
+                            missingModalContent = details.map { (lrno, info) -> "$lrno: $info" }
                             missingModalTitle = "Missing LR for PRN"
                             showMissingModal = true
                         }
@@ -311,12 +310,11 @@ fun PreviewInwardScreen(
                                 } else {
                                     (1..detail.totalPkg).joinToString(",")
                                 }
-                                detail.lrno to missing
+                                detail.lrno to "Missing: $missing | ToPlace: ${detail.toPlace}"
                             }.filter { (_, missing) ->
                                 missing != "None"
                             }
-                            missingModalContent =
-                                details.map { (lrno, missing) -> "$lrno: $missing" }
+                            missingModalContent = details.map { (lrno, info) -> "$lrno: $info" }
                             missingModalTitle = "Missing LR for THC"
                             showMissingModal = true
                         }
@@ -645,7 +643,7 @@ suspend fun fetchLRDetailsForToken(token: String, type: String): List<LRDetails>
                     (0 until jsonArray.length()).map { idx ->
                         val obj = jsonArray.getJSONObject(idx)
                         LRDetails(
-                            lrno = obj.getString("LRNO"), totalPkg = obj.getInt("PkgsNo")
+                            lrno = obj.getString("LRNO"), totalPkg = obj.getInt("PkgsNo"), toPlace = obj.getString("ToPlace")
                         )
                     }
                 } else {
@@ -829,7 +827,7 @@ data class ArrivalData(
 )
 
 data class LRDetails(
-    val lrno: String, val totalPkg: Int
+    val lrno: String, val totalPkg: Int, val toPlace: String
 )
 
 data class InwardDataResult(

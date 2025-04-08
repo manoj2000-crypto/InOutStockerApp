@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.inoutstocker"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.2025.03.31.006" // MajorVersion.DATE(YEAR.MONTH.DAY).SUBVERSION
+        versionCode = 2
+        versionName = "2.2025.04.08.007" // MajorVersion.DATE(YEAR.MONTH.DAY).SUBVERSION
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
