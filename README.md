@@ -4,6 +4,26 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 
 ---
 
+## 📑 Table of Contents
+
+- [InOutStockerApp](#inoutstockerapp)  
+- [Authentication & QR Code Scanning](#authentication-qr-code-scanning)  
+- [Key Features](#key-features)  
+- [Highlights / Technologies](#highlights-technologies)  
+- [Tech Stack](#tech-stack)  
+- [Screenshots](#screenshots)  
+  - [App Logo](#app-logo)  
+  - [Login Screen](#login-screen)  
+  - [Home Screen](#home-screen)  
+  - [Common Screen (Audit, Inward, Outward)](#common-screen-audit-inward-outward)  
+  - [Common Screen with sample data (Audit, Inward, Outward)](#common-screen-with-sample-data-audit-inward-outward)  
+- [Getting Started](#getting-started)  
+  - [Prerequisites](#prerequisites)  
+  - [Build & Run](#build-run)  
+- [Contact](#contact)  
+
+---
+
 ## 🔐 Authentication & QR Code Scanning
 
 - Users must log in before using the app.
@@ -61,7 +81,7 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 ## 📸 Screenshots
 
 ### 🖼️ App Logo
-#![App Logo](app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp)
+![App Logo](app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp)
 
 ### 🔐 Login Screen
 <img src="https://github.com/user-attachments/assets/4a4703e8-7178-4bc4-bf61-b9e3e3c718bd" alt="Login Screen" width="300"/>   
@@ -69,12 +89,12 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 ### 🏠 Home Screen
 <img src="https://github.com/user-attachments/assets/a2fe5b65-67f4-41fa-8ed7-42a15cd21181" alt="Home Screen with small dashboard" width="300"/>   
 
-### Common Screen(Audit, Inward, Outward)
+### 📊 Common Screen(Audit, Inward, Outward)
 | Audit | Inward | Outward |
 |:-----:|:------:|:-------:|
 | <img src="https://github.com/user-attachments/assets/b30ae3f2-def9-4736-b88c-fc3228962878" alt="Audit" width="150" /> | <img src="https://github.com/user-attachments/assets/ff11c461-4142-4892-adda-ff192a7aa083" alt="Inward" width="150" /> | <img src="https://github.com/user-attachments/assets/3c63ca93-7a85-4fbe-a0b2-c564d1329da4" alt="Outward" width="150" /> |
 
-### Common Screen with sample data (Audit, Inward, Outward)
+### 📊 Common Screen with sample data (Audit, Inward, Outward)
 | Audit | Inward | Outward |
 |:-----:|:------:|:-------:|
 | <img src="https://github.com/user-attachments/assets/ea4e2bf7-ab44-402f-93a9-558ed18aee9a" alt="Audit with scanned data" width="150" /> | <img src="https://github.com/user-attachments/assets/6ffc6449-aa44-43fb-aa79-8b31eab6fce0" alt="Inward with scanned data" width="150" /> | <img src="https://github.com/user-attachments/assets/54418911-89b0-41dc-931c-87e98d8371cd" alt="Outward with scanned data" width="150" /> |
@@ -102,7 +122,7 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 
 ---
 
-### 8. Contact
+### Contact
 
 ## 📬 Contact
 
