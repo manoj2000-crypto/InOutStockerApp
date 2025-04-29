@@ -7,19 +7,19 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 ## 📑 Table of Contents
 
 - [InOutStockerApp](#inoutstockerapp)  
-- [Authentication & QR Code Scanning](#-authentication-qr-code-scanning)  
+- [Authentication & QR Code Scanning](#-authentication--qr-code-scanning)  
 - [Key Features](#-key-features)  
 - [Highlights / Technologies](#-highlights--technologies)  
 - [Tech Stack](#-tech-stack)  
 - [Screenshots](#-screenshots)  
-  - [App Logo](#-app-logo)  
+  - [App Logo](#app-logo)  
   - [Login Screen](#-login-screen)  
   - [Home Screen](#-home-screen)  
   - [Common Screen (Audit, Inward, Outward)](#-common-screenaudit-inward-outward)  
   - [Common Screen with sample data (Audit, Inward, Outward)](#-common-screen-with-sample-data-audit-inward-outward)  
 - [Getting Started](#-getting-started)  
   - [Prerequisites](#prerequisites)  
-  - [Build & Run](#-build-run)  
+  - [Build & Run](#build-run)  
 - [Contact](#contact)  
 
 ---
@@ -80,7 +80,7 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 
 ## 📸 Screenshots
 
-### 🖼️ App Logo
+### App Logo
 ![App Logo](app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp)
 
 ### 🔐 Login Screen
