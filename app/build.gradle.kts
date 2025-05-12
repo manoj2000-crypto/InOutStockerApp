@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.inoutstocker"
+    namespace = "com.vtc3pl.inoutstocker"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.inoutstocker"
+        applicationId = "com.vtc3pl.inoutstocker"
         minSdk = 23
         targetSdk = 35
-        versionCode = 4
-        versionName = "4.2025.05.12.009" // MajorVersion.DATE(YEAR.MONTH.DAY).SUBVERSION
+        versionCode = 5
+        versionName = "5.2025.05.12.010" // MajorVersion.DATE(YEAR.MONTH.DAY).SUBVERSION
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
