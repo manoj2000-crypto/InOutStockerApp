@@ -24,12 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SourceLockedOrientationActivity")
 @Composable
 fun PrnOutwardScreen(
-    username: String, depot: String, onPreview: () -> Unit, sharedViewModel: SharedViewModel
+    navController: NavController,
+    username: String,
+    depot: String,
+    onPreview: () -> Unit,
+    sharedViewModel: SharedViewModel
 ) {
     //Stopping user to change the orientation from vertical to portrait
     val context = LocalContext.current
@@ -95,7 +100,11 @@ fun PrnOutwardScreen(
                     }
 
                     "bluetooth" -> {
-                        ComingSoonView()
+                        ComingSoonView(
+                            sharedViewModel = sharedViewModel, onPreview = {
+                                sharedViewModel.setFeatureType(SharedViewModel.FeatureType.PRN_OUTWARD)
+                                navController.navigate("previewPrnScreen/$username/$depot")
+                            })
                     }
 
                 }

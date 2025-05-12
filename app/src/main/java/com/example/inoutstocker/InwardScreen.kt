@@ -98,7 +98,11 @@ fun InwardScreen(
                     }
 
                     "bluetooth" -> {
-                        ComingSoonView()
+                        ComingSoonView(
+                            sharedViewModel = sharedViewModel, onPreview = {
+                                sharedViewModel.setFeatureType(SharedViewModel.FeatureType.INWARD)
+                                navController.navigate("previewInwardScreen/$username/$depot")
+                            })
                     }
                 }
             }

@@ -1,3 +1,21 @@
+/**
+ * InOutStocker Android App
+ *
+ * Created for:
+ *   VTC 3 PL SERVICES LTD
+ *
+ * Author:
+ *   Manoj Kale (Emp ID: PNA2525)
+ *   SWATPRO TECHNOLOGIES PVT. LTD.
+ *
+ * Description:
+ *   MainActivity hosts the Compose navigation and handles runtime permissions.
+ *   It ensures the screen stays awake, manages camera/bluetooth permissions,
+ *   and launches the app’s navigation graph.
+ *
+ * © 2025 SWATPRO TECHNOLOGIES PVT. LTD. All rights reserved.
+ */
+
 package com.example.inoutstocker
 
 import android.annotation.SuppressLint
@@ -65,10 +83,15 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
 import androidx.core.content.edit
+import android.view.WindowManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // KEEP SCREEN ON for the entire Activity (all Compose content)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         setContent {
             InOutStockerTheme {
                 val navController = rememberNavController()

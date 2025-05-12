@@ -2,6 +2,7 @@ package com.example.inoutstocker
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -105,7 +106,12 @@ fun OutwardScanScreen(
                     }
 
                     "bluetooth" -> {
-                        ComingSoonView()
+                        ComingSoonView(
+                            sharedViewModel = sharedViewModel, onPreview = {
+                                sharedViewModel.setFeatureType(SharedViewModel.FeatureType.OUTWARD)
+                                val encodedGroupCode = Uri.encode(groupCode)
+                                navController.navigate("previewOutwardScreen/$username/$depot/$loadingSheetNo/$encodedGroupCode")
+                            })
                     }
                 }
             }

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import java.net.URLEncoder
 
 @Composable
 fun AppNavigation(
@@ -43,9 +44,11 @@ fun AppNavigation(
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.AUDIT)
-            AuditScreen(username = username, depot = depot, onPreview = {
-                navController.navigate("previewAuditScreen/$username/$depot")
-            }, sharedViewModel = sharedViewModel)
+            AuditScreen(
+                username = username, depot = depot, onPreview = {
+                    navController.navigate("previewAuditScreen/$username/$depot")
+                }, sharedViewModel = sharedViewModel, navController = navController
+            )
         }
 
         //Saving the Audited data on the server and user can able to go back and scan the remaining items also.
@@ -89,7 +92,7 @@ fun AppNavigation(
                 depot = depot,
                 onBack = { navController.popBackStack() },
                 navigateToFinalCalculation = { prnOrThc, prn, username, depot, scannedItems ->
-                    val encodedScannedItems = java.net.URLEncoder.encode(
+                    val encodedScannedItems = URLEncoder.encode(
                         scannedItems.joinToString(";") {
                             "${it.first},${it.second.first},${
                                 it.second.second.joinToString(
@@ -101,7 +104,7 @@ fun AppNavigation(
                     navController.navigate("finalCalculationScreen/$prnOrThc/$prn/$username/$depot/$encodedScannedItems")
                 },
                 navigateToDRSPage = { prnOrThc, prn, username, depot, scannedItems ->
-                    val encodedScannedItems = java.net.URLEncoder.encode(
+                    val encodedScannedItems = URLEncoder.encode(
                         scannedItems.joinToString(";") {
                             "${it.first},${it.second.first},${it.second.second.joinToString(",")}"
                         }, "UTF-8"
@@ -259,9 +262,11 @@ fun AppNavigation(
             val username = backStackEntry.arguments?.getString("username") ?: ""
             val depot = backStackEntry.arguments?.getString("depot") ?: ""
             sharedViewModel.setFeatureType(SharedViewModel.FeatureType.PRN_OUTWARD)
-            PrnOutwardScreen(username = username, depot = depot, onPreview = {
-                navController.navigate("previewPrnScreen/$username/$depot")
-            }, sharedViewModel = sharedViewModel)
+            PrnOutwardScreen(
+                username = username, depot = depot, onPreview = {
+                    navController.navigate("previewPrnScreen/$username/$depot")
+                }, sharedViewModel = sharedViewModel, navController = navController
+            )
         }
 
         // PREVIEW SCREEN FOR PRN OUTWARD AND WEIGHT CALCULATION AND THEN PROCEED TO FINAL CALCULATION SCREEN FOR PRN OUTWARD
@@ -275,8 +280,7 @@ fun AppNavigation(
                 depot = depot,
                 sharedViewModel = sharedViewModel,
                 navController = navController,
-                onBack = { navController.popBackStack() }
-            )
+                onBack = { navController.popBackStack() })
         }
 
         //FINAL CALCULATION FOR PRN OUTWARD ADN THEN GO TO HOME SCREEN
