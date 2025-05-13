@@ -4,15 +4,15 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.example.inoutstocker",
+  "applicationId": "com.vtc3pl.inoutstocker",
   "variantName": "release",
   "elements": [
     {
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 3,
-      "versionName": "3.2025.04.16.008",
+      "versionCode": 6,
+      "versionName": "6.2025.05.13.011",
       "outputFile": "app-release.apk"
     }
   ],
