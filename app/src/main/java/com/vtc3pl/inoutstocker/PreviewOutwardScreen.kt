@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +16,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,6 +84,9 @@ fun PreviewOutwardScreen(
     val drsLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LSD") }
     val thcLoadingSheets = loadingSheetNo.split(",").filter { it.startsWith("LST") }
 
+    val allTokens: List<String> = (drsLoadingSheets + thcLoadingSheets).distinct()
+    val allTokensString: String = allTokens.joinToString(separator = ",")
+
     // Compute excessLrType dynamically based on available loading sheets
     val computedExcessLrType = when {
         drsLoadingSheets.isNotEmpty() && thcLoadingSheets.isNotEmpty() -> "MANIFEST"
@@ -109,65 +115,59 @@ fun PreviewOutwardScreen(
     var excessStatuses by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var disallowGetData by remember { mutableStateOf(false) }
 
+    var missingPerSheet by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
 
     LaunchedEffect(loadingSheetNo) {
         when {
-            // Both DRS and THC sheets are available
             drsLoadingSheets.isNotEmpty() && thcLoadingSheets.isNotEmpty() -> {
-                val drsResults = fetchLrnosFromServer(
-                    outwardScannedLrnos,
-                    drsLoadingSheets,
-                    "fetch_drs_lrnos.php"
+                val (drsCat, drsEx, drsMiss) = fetchLrnosFromServer(
+                    outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos_new.php"
                 )
-                categorizedLrnos = drsResults.first
-                var remainingLrnos = drsResults.second  // LRNO not found in DRS
+                categorizedLrnos = drsCat
+                // you could merge drsMiss into a global missing map if you want
 
-                if (remainingLrnos.isNotEmpty()) {
-                    val thcResults = fetchLrnosFromServer(
-                        remainingLrnos,
-                        thcLoadingSheets,
-                        "fetch_thc_lrnos.php"
+                val remaining = drsEx
+                if (remaining.isNotEmpty()) {
+                    val (thcCat, thcEx, thcMiss) = fetchLrnosFromServer(
+                        remaining, thcLoadingSheets, "fetch_thc_lrnos_new.php"
                     )
-                    categorizedLrnos = categorizedLrnos + thcResults.first
-                    excessLrnos = thcResults.second
-                } else {
-                    excessLrnos = emptyList()
+                    // merge categorization
+                    categorizedLrnos = categorizedLrnos + thcCat
+                    excessLrnos = thcEx
+                    // if you want sheet-wise missing, combine maps:
+                    missingPerSheet = drsMiss + thcMiss
                 }
             }
-            // Only DRS sheets available
+
             drsLoadingSheets.isNotEmpty() -> {
-                val drsResults = fetchLrnosFromServer(
-                    outwardScannedLrnos,
-                    drsLoadingSheets,
-                    "fetch_drs_lrnos.php"
+                val (cat, ex, miss) = fetchLrnosFromServer(
+                    outwardScannedLrnos, drsLoadingSheets, "fetch_drs_lrnos_new.php"
                 )
-                categorizedLrnos = drsResults.first
-                excessLrnos = drsResults.second
+                categorizedLrnos = cat
+                excessLrnos = ex
+                missingPerSheet = miss
             }
-            // Only THC sheets available
+
             thcLoadingSheets.isNotEmpty() -> {
-                val thcResults = fetchLrnosFromServer(
-                    outwardScannedLrnos,
-                    thcLoadingSheets,
-                    "fetch_thc_lrnos.php"
+                val (cat, ex, miss) = fetchLrnosFromServer(
+                    outwardScannedLrnos, thcLoadingSheets, "fetch_thc_lrnos_new.php"
                 )
-                categorizedLrnos = thcResults.first
-                excessLrnos = thcResults.second
+                categorizedLrnos = cat
+                excessLrnos = ex
+                missingPerSheet = miss
             }
-            // No valid loading sheets provided
+
             else -> {
                 categorizedLrnos = emptyMap()
                 excessLrnos = emptyList()
+                missingPerSheet = emptyMap()
             }
         }
 
-        // Update the SharedViewModel with the categorized mapping
         sharedViewModel.updateCategorizedLrnos(categorizedLrnos)
-        Log.d("CategorizedMapping", "Stored mapping ::::::::=::::::: $categorizedLrnos")
-
-        // Indicate that categorization is complete
         isCategorizing = false
     }
+
 
     // Automatically send Excess LR data when new excess LRs are detected
     LaunchedEffect(excessLrnos) {
@@ -205,7 +205,8 @@ fun PreviewOutwardScreen(
                             processedExcessLrnos.add(lr)
                             Log.i("PreviewOutwardScreen", "Processed Excess LR: $lr")
                         }
-                    }
+                    },
+                    tokenNumbersForExcessLrOnly = allTokensString
                 )
             }
         }
@@ -253,6 +254,15 @@ fun PreviewOutwardScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp) // This ensures some space between items
             ) {
+
+                item {
+                    MissingLrnosCard(missingPerSheet = missingPerSheet)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 item {
                     Text("Scanned LR Numbers", style = MaterialTheme.typography.headlineSmall)
                 }
@@ -341,7 +351,8 @@ fun PreviewOutwardScreen(
                                         isLoading = false
                                         isDataFetched = totalQtyScanned > 0 && totalWeight > 0.0
                                     }
-                                }, modifier = Modifier.fillMaxWidth(),
+                                },
+                                modifier = Modifier.fillMaxWidth(),
                                 enabled = !isLoading && !isDataFetched
                             ) {
                                 Text("Get Data")
@@ -401,12 +412,62 @@ fun PreviewOutwardScreen(
     }
 }
 
+@Composable
+fun MissingLrnosCard(missingPerSheet: Map<String, List<String>>) {
+    if (missingPerSheet.isEmpty()) return
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(
+            text = "Missing LR Numbers",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.error
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, Color.Red),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                val entries = missingPerSheet.entries.filter { it.value.isNotEmpty() }
+                entries.forEachIndexed { index, (lsno, missedLrnos) ->
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            text = "LSNO: $lsno",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = missedLrnos.joinToString(", "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+
+                    if (index < entries.size - 1) {
+                        HorizontalDivider(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            thickness = 1.dp,
+                            color = Color.LightGray
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 fun fetchExcessStatuses(excessLrnos: List<String>, onResult: (Map<String, Int>) -> Unit) {
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/check_excess_status.php"
-    val formBody = FormBody.Builder()
-        .add("excessLRs", excessLrnos.joinToString(","))
-        .build()
+    val formBody = FormBody.Builder().add("excessLRs", excessLrnos.joinToString(",")).build()
     val request = Request.Builder().url(url).post(formBody).build()
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
@@ -446,8 +507,7 @@ fun fetchWeightsFromServer(
     onResult: (totalBoxQty: Int, totalBoxWeight: Double, totalBagQty: Int, totalBagWeight: Double, pkgType: String) -> Unit // Returns TotalQty and TotalWeight
 ) {
     Log.i(
-        "fetchWeightsFromServer",
-        "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
+        "fetchWeightsFromServer", "Starting fetchWeightsFromServer with scannedItems: $scannedItems"
     )
     val client = OkHttpClient()
 
@@ -479,9 +539,9 @@ fun fetchWeightsFromServer(
 //        .url("https://vtc3pl.com/fetch_total_weight_qty_outward_inoutstocker_app.php").post(body)
 //        .build()
 
-    val request = Request.Builder()
-        .url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php").post(body)
-        .build()
+    val request =
+        Request.Builder().url("https://vtc3pl.com/fetch_total_weight_qty_inoutstocker_app.php")
+            .post(body).build()
 
     client.newCall(request).enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
@@ -491,8 +551,7 @@ fun fetchWeightsFromServer(
 
         override fun onResponse(call: Call, response: Response) {
             Log.i(
-                "fetchWeightsFromServer",
-                "onResponse triggered with status code: ${response.code}"
+                "fetchWeightsFromServer", "onResponse triggered with status code: ${response.code}"
             )
 
             if (response.isSuccessful) {
@@ -519,137 +578,147 @@ fun fetchWeightsFromServer(
 }
 
 private val client = OkHttpClient()
-suspend fun fetchLrnosFromServer(
-    scannedLrnos: List<String>,
-    loadingSheets: List<String>,
-    endpoint: String
-): Pair<Map<String, List<String>>, List<String>> {
-    // Log input validation
-    if (scannedLrnos.isEmpty() || loadingSheets.isEmpty()) {
-        Log.w("PreviewOutwardScreen", "fetchLrnosFromServer: Empty scannedLrnos or loadingSheets")
-        return Pair(emptyMap(), emptyList())
-    }
 
-    // Construct URL and request parameters
-    val url = "https://vtc3pl.com/$endpoint"
-    Log.d("PreviewOutwardScreen", "fetchLrnosFromServer: URL -> $url")
+// 1) Update signature to return Triple<categ, excess, missing>
+suspend fun fetchLrnosFromServer(
+    scannedLrnos: List<String>, loadingSheets: List<String>, endpoint: String
+): Triple<Map<String, List<String>>, List<String>, Map<String, List<String>>> {
+
     Log.d(
-        "PreviewOutwardScreen",
-        "fetchLrnosFromServer: Parameters -> lrnos: ${scannedLrnos.joinToString(",")}, loadingSheetNos: ${
-            loadingSheets.joinToString(
-                ","
-            )
-        }"
+        "FetchLrnos",
+        "Inputs - scannedLrnos: $scannedLrnos, loadingSheets: $loadingSheets, endpoint: $endpoint"
     )
 
-    val requestBody = FormBody.Builder()
-        .add("lrnos", scannedLrnos.joinToString(","))
-        .add("loadingSheetNos", loadingSheets.joinToString(","))
-        .build()
+    // early exit
+    if (scannedLrnos.isEmpty() || loadingSheets.isEmpty()) {
+        Log.w("FetchLrnos", "Early exit due to empty scannedLrnos or loadingSheets")
+        return Triple(emptyMap(), emptyList(), emptyMap())
+    }
 
-    val request = Request.Builder()
-        .url(url)
-        .post(requestBody)
-        .build()
+    val url = "https://vtc3pl.com/$endpoint"
+    val requestBody = FormBody.Builder().add("lrnos", scannedLrnos.joinToString(","))
+        .add("loadingSheetNos", loadingSheets.joinToString(",")).build()
+    val request = Request.Builder().url(url).post(requestBody).build()
 
     return try {
         withContext(Dispatchers.IO) {
-            Log.d("PreviewOutwardScreen", "fetchLrnosFromServer: Initiating network call...")
+            Log.d(
+                "FetchLrnos",
+                "Sending POST request to $url with body: lrnos=${scannedLrnos.joinToString(",")}, loadingSheetNos=${
+                    loadingSheets.joinToString(",")
+                }"
+            )
+
             val response = client.newCall(request).execute()
-            Log.d("PreviewOutwardScreen", "fetchLrnosFromServer: Response code: ${response.code}")
+            val rawBody = response.body?.string().orEmpty()
+            Log.d("FetchLrnos", "Response received: ${response.code} - $rawBody")
 
             if (!response.isSuccessful) {
-                Log.e(
-                    "PreviewOutwardScreen",
-                    "fetchLrnosFromServer: Server Error: ${response.code}"
-                )
-                return@withContext Pair(emptyMap(), emptyList())
+                Log.e("FetchLrnos", "Request failed with status code: ${response.code}")
+                return@withContext Triple(emptyMap(), emptyList(), emptyMap())
             }
+            val json = JSONObject(rawBody)
 
-            val responseBody = response.body?.string()
-            if (responseBody.isNullOrEmpty()) {
-                Log.e("PreviewOutwardScreen", "fetchLrnosFromServer: Empty response body")
-                return@withContext Pair(emptyMap(), emptyList())
-            }
+            // parse categorized
+            val categorized = mutableMapOf<String, List<String>>()
+            val foundSet = mutableSetOf<String>()
+            val missing = mutableMapOf<String, List<String>>()
+            val excess = mutableListOf<String>()
 
-            Log.d("PreviewOutwardScreen", "fetchLrnosFromServer: Response body -> $responseBody")
-
-            // Parse JSON response with additional logging and type-checking for "excess"
-            try {
-                val jsonObject = JSONObject(responseBody)
-                val categorizedLrnos = mutableMapOf<String, List<String>>()
-                val excessLrnos = mutableListOf<String>()
-                val categorizedSet = mutableSetOf<String>()
-
-                val keys = jsonObject.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    Log.d("PreviewOutwardScreen", "fetchLrnosFromServer: Processing key: $key")
-                    if (key == "excess") {
-                        // Check if "excess" is a JSONArray or JSONObject
-                        val excessValue = jsonObject.get("excess")
-                        if (excessValue is JSONArray) {
-                            val lrnosList =
-                                List(excessValue.length()) { index -> excessValue.getString(index) }
-                            excessLrnos.addAll(lrnosList)
-                            Log.d(
-                                "PreviewOutwardScreen",
-                                "fetchLrnosFromServer: Excess LRNOs (JSONArray): $lrnosList"
-                            )
-                        } else if (excessValue is JSONObject) {
-                            val lrnosList = mutableListOf<String>()
-                            val excessKeys = excessValue.keys()
-                            while (excessKeys.hasNext()) {
-                                val exKey = excessKeys.next()
-                                lrnosList.add(excessValue.getString(exKey))
-                            }
-                            excessLrnos.addAll(lrnosList)
-                            Log.d(
-                                "PreviewOutwardScreen",
-                                "fetchLrnosFromServer: Excess LRNOs (JSONObject): $lrnosList"
-                            )
-                        } else {
-                            Log.e(
-                                "PreviewOutwardScreen",
-                                "fetchLrnosFromServer: Unexpected type for 'excess': ${excessValue.javaClass}"
-                            )
+            // a) missing in JSON
+            if (json.has("missing")) {
+                when (val missVal = json.get("missing")) {
+                    is JSONObject -> {
+                        missVal.keys().forEach { lsno ->
+                            val arr = missVal.getJSONArray(lsno)
+                            missing[lsno] = List(arr.length()) { i -> arr.getString(i) }
                         }
-                    } else {
-                        // Process other keys as JSONArray
-                        val lrnosArray = jsonObject.getJSONArray(key)
-                        val lrnosList =
-                            List(lrnosArray.length()) { index -> lrnosArray.getString(index) }
-                        categorizedLrnos[key] = lrnosList
-                        categorizedSet.addAll(lrnosList)
-                        Log.d(
-                            "PreviewOutwardScreen",
-                            "fetchLrnosFromServer: Categorized LRNOs for key '$key': $lrnosList"
-                        )
+                    }
+
+                    is JSONArray -> {
+                        // just log and ignore since no useful data structure to parse here
+                        Log.d("FetchLrnos", "Missing is an empty array, nothing to parse.")
+                    }
+
+                    else -> {
+                        Log.w("FetchLrnos", "Unexpected type for 'missing': ${missVal::class.java}")
                     }
                 }
-
-                // Filter out duplicate excess LRNOs that appear in categorized data
-                val uniqueExcessLrnos = excessLrnos.filterNot { it in categorizedSet }.toSet()
-                Log.d(
-                    "PreviewOutwardScreen",
-                    "fetchLrnosFromServer: Unique excess LRNOs: $uniqueExcessLrnos"
-                )
-
-                Pair(categorizedLrnos, uniqueExcessLrnos.toList())
-            } catch (jsonEx: Exception) {
-                Log.e(
-                    "PreviewOutwardScreen",
-                    "fetchLrnosFromServer: JSON Parsing error: ${jsonEx.message}"
-                )
-                Pair(emptyMap(), emptyList())
             }
+            Log.d("FetchLrnos", "Missing: $missing")
+
+            // b) excess in JSON
+            if (json.has("excess")) {
+                when (val exVal = json.get("excess")) {
+                    is JSONArray -> {
+                        Log.d("FetchLrnos", "Excess is a JSONArray")
+                        for (i in 0 until exVal.length()) {
+                            excess += exVal.getString(i)
+                        }
+                    }
+
+                    is JSONObject -> {
+                        Log.d("FetchLrnos", "Excess is a JSONObject")
+                        exVal.keys().forEach { key ->
+                            val value = exVal.get(key)
+                            when (value) {
+                                is String -> excess += value
+                                is JSONArray -> {
+                                    for (i in 0 until value.length()) {
+                                        excess += value.getString(i)
+                                    }
+                                }
+
+                                else -> Log.w(
+                                    "FetchLrnos",
+                                    "Unhandled excess value type: ${value::class.java}"
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {
+                        Log.w("FetchLrnos", "Unexpected type for 'excess': ${exVal::class.java}")
+                    }
+                }
+            }
+            Log.d("FetchLrnos", "Excess: $excess")
+
+            // c) categorized in JSON
+            if (json.has("categorized")) {
+                val catVal = json.get("categorized")
+                if (catVal is JSONObject) {
+                    catVal.keys().forEach { lsno ->
+                        val value = catVal.get(lsno)
+                        if (value is JSONArray) {
+                            val list = List(value.length()) { i -> value.getString(i) }
+                            categorized[lsno] = list
+                            foundSet += list
+                        } else {
+                            Log.w(
+                                "FetchLrnos",
+                                "Expected JSONArray for categorized[$lsno], but got ${value::class.java}"
+                            )
+                        }
+                    }
+                } else {
+                    Log.w(
+                        "FetchLrnos",
+                        "Expected JSONObject for 'categorized', but got ${catVal::class.java}"
+                    )
+                }
+            }
+            Log.d("FetchLrnos", "Categorized: $categorized")
+
+            // ensure excess is only those not in categorized
+            val uniqueExcess = excess.filterNot { it in foundSet }.distinct()
+            Log.d("FetchLrnos", "Filtered unique excess: $uniqueExcess")
+
+            Triple(categorized, uniqueExcess, missing)
         }
     } catch (e: Exception) {
-        Log.e(
-            "PreviewOutwardScreen",
-            "fetchLrnosFromServer: Exception during network call: ${e.message}"
-        )
-        Pair(emptyMap(), emptyList())
+        Log.e("FetchLrnos", "Exception occurred: ${e.localizedMessage}", e)
+        Triple(emptyMap(), emptyList(), emptyMap())
     }
 }
 
