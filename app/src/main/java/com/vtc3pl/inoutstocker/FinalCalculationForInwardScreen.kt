@@ -148,11 +148,11 @@ fun FinalCalculationForInwardScreen(
     var finalAmount by remember { mutableIntStateOf(totalAmount) }
     var freight by remember { mutableStateOf("0") }
     var godownKeeperName by remember { mutableStateOf("") }
-    var closingKm by remember { mutableStateOf("") }
+    var closingKm by remember { mutableStateOf("0") }
 
-    var paymentMode by remember { mutableStateOf("") }
-    var transactionId by remember { mutableStateOf("") }
-    var unloadingHamaliReceived by remember { mutableStateOf("") }
+    var paymentMode by remember { mutableStateOf("BANK") }
+    var transactionId by remember { mutableStateOf("0") }
+    var unloadingHamaliReceived by remember { mutableStateOf("0") }
     var reason by remember { mutableStateOf("") }
     var vendorType by remember { mutableStateOf("ATTACHED") }
     var vendorName by remember { mutableStateOf("") }
