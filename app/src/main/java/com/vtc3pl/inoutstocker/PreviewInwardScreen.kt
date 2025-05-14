@@ -103,6 +103,10 @@ fun PreviewInwardScreen(
     // Filter out the processed LR numbers from the excess list
     val filteredExcessLrData = excessLrData.filterNot { it in processedLRNos }
 
+    //added this for getting the idea for only the from where it is coming the excess.
+    var allTokens by remember { mutableStateOf<List<String>>(emptyList()) }
+    var allTokensString by remember { mutableStateOf("") }
+
     LaunchedEffect(scannedItems) {
         coroutineScope.launch {
             val (prnResults, thcResults, drsResults, excessLrs) = fetchInwardData(
@@ -112,6 +116,12 @@ fun PreviewInwardScreen(
             thcData.addAll(thcResults)
             drsData.addAll(drsResults)
             excessLrData.addAll(excessLrs)
+
+            // inside your LaunchedEffect block, once prnData, thcData and drsData are populated:
+            allTokens =
+                (prnData.map { it.first } + thcData.map { it.first } + drsData.map { it.first }).distinct()
+
+            allTokensString = allTokens.joinToString(",")
 
             isLoading = false
         }
@@ -416,6 +426,7 @@ fun PreviewInwardScreen(
                                 depot = depot,
                                 excessLrType = computedExcessLrType,
                                 excessFeatureType = "INWARD",
+                                tokenNumbersForExcessLrOnly = allTokensString,
                                 onError = { error -> errorMessage = error },
                                 onSuccess = {
                                     newExcessLRs.forEach { lr ->
@@ -671,7 +682,9 @@ suspend fun fetchLRDetailsForToken(token: String, type: String): List<LRDetails>
                     (0 until jsonArray.length()).map { idx ->
                         val obj = jsonArray.getJSONObject(idx)
                         LRDetails(
-                            lrno = obj.getString("LRNO"), totalPkg = obj.getInt("PkgsNo"), toPlace = obj.getString("ToPlace")
+                            lrno = obj.getString("LRNO"),
+                            totalPkg = obj.getInt("PkgsNo"),
+                            toPlace = obj.getString("ToPlace")
                         )
                     }
                 } else {
@@ -713,7 +726,8 @@ suspend fun sendExcessLRData(
     excessLrType: String,
     excessFeatureType: String,
     onError: (String) -> Unit,
-    onSuccess: () -> Unit
+    onSuccess: () -> Unit,
+    tokenNumbersForExcessLrOnly: String
 ) {
     val client = OkHttpClient()
     val url = "https://vtc3pl.com/insert_excess_lr.php"
@@ -723,7 +737,7 @@ suspend fun sendExcessLRData(
 
     val formBody = FormBody.Builder().add("ScanUser", username).add("ScanDepot", depot)
         .add("ExcessLrType", excessLrType).add("ExcessFeatureType", excessFeatureType)
-        .add("excessLRData", jsonData).build()
+        .add("ReferenceNumber", tokenNumbersForExcessLrOnly).add("excessLRData", jsonData).build()
 
     val request = Request.Builder().url(url).post(formBody).build()
 
