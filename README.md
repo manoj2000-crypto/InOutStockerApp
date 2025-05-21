@@ -113,7 +113,7 @@ InOutStockerApp is an Android inventory management app built entirely in Kotlin.
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/manoj2000-crypto/InOutStockerApp.git
+   git clone https://github.com/manojkalemk/InOutStockerApp.git
    ```
 2. Open in Android Studio (File > Open).
 3. Let Gradle sync and build.
